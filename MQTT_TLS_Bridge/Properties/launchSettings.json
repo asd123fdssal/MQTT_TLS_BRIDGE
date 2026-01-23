@@ -1,0 +1,7 @@
+{
+  "profiles": {
+    "MQTT_TLS_Bridge": {
+      "commandName": "Project"
+    }
+  }
+}
