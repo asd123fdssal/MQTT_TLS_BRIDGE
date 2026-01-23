@@ -240,7 +240,18 @@
                                        Click="UnsubscribeButton_Click"/>
 
                             <!-- Added -->
-                            <Label Margin="4,10,0,0">Subscribed Topics</Label>
+                            <Grid Margin="4,10,4,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <Label Grid.Column="0">Subscribed Topics</Label>
+                                <ui:Button Grid.Column="1"
+                                           Content="Clear"
+                                           Click="ClearSubscribedTopicsButton_Click" />
+                            </Grid>
+
                             <ListBox x:Name="SubscribedTopicListBox"
                                      Margin="4,0,4,0"
                                      Height="130"
@@ -316,7 +327,18 @@
                                     <RowDefinition Height="*"/>
                                 </Grid.RowDefinitions>
 
-                                <Label Grid.Row="0">Received Topics</Label>
+                                <Grid Grid.Row="0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <Label Grid.Column="0">Received Topics</Label>
+                                    <ui:Button Grid.Column="1"
+                                               Content="Clear"
+                                               Click="ClearClientTopicsButton_Click" />
+                                </Grid>
+
                                 <ListBox Grid.Row="1"
                                          x:Name="ClientTopicListBox"
                                          SelectionChanged="ClientTopicListBox_SelectionChanged"/>
@@ -451,7 +473,18 @@
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
 
-                            <Label Grid.Row="0">Topic List</Label>
+                            <Grid Grid.Row="0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <Label Grid.Column="0">Topic List</Label>
+                                <ui:Button Grid.Column="1"
+                                           Content="Clear"
+                                           Click="ClearBrokerTopicsButton_Click" />
+                            </Grid>
+
                             <ListBox Grid.Row="1"
                                      x:Name="TopicListBox"
                                      SelectionChanged="TopicListBox_SelectionChanged"/>

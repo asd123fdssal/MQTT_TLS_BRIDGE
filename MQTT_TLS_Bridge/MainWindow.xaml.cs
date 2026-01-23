@@ -34,6 +34,10 @@ namespace MQTT_TLS_Bridge
         private AppSettings? _lastLoadedSettings;
         private bool _isShuttingDown;
 
+        // Log trimming policy
+        private const int MaxLogLines = 200;   // 최대 유지 라인
+        private const int TrimLogLines = 200; // 초과 시 한 번에 지울 라인
+
         public MainWindow()
         {
             InitializeComponent();
@@ -458,12 +462,41 @@ namespace MQTT_TLS_Bridge
             });
         }
 
+        private static void AppendLogLine(TextBox textBox, string line, int maxLines, int trimLines)
+        {
+            textBox.AppendText(line);
+
+            if (textBox.LineCount <= maxLines)
+            {
+                textBox.ScrollToEnd();
+                return;
+            }
+
+            if (trimLines < 1)
+                trimLines = 1;
+
+            if (trimLines >= textBox.LineCount)
+            {
+                textBox.Clear();
+                return;
+            }
+
+            var charIndex = textBox.GetCharacterIndexFromLineIndex(trimLines);
+            if (charIndex > 0)
+            {
+                textBox.Select(0, charIndex);
+                textBox.SelectedText = string.Empty;
+            }
+
+            textBox.CaretIndex = textBox.Text.Length;
+            textBox.ScrollToEnd();
+        }
+
         private void AppendBrokerLog(string message)
         {
             Dispatcher.Invoke(() =>
             {
-                BrokerLogTextBox.AppendText($"[{DateTime.Now:HH:mm:ss}] {message}\r\n");
-                BrokerLogTextBox.ScrollToEnd();
+                AppendLogLine(BrokerLogTextBox, $"[{DateTime.Now:HH:mm:ss}] {message}\r\n", MaxLogLines, TrimLogLines);
             });
         }
 
@@ -471,8 +504,7 @@ namespace MQTT_TLS_Bridge
         {
             Dispatcher.Invoke(() =>
             {
-                ClientLogTextBox.AppendText($"[{DateTime.Now:HH:mm:ss}] {message}\r\n");
-                ClientLogTextBox.ScrollToEnd();
+                AppendLogLine(ClientLogTextBox, $"[{DateTime.Now:HH:mm:ss}] {message}\r\n", MaxLogLines, TrimLogLines);
             });
         }
 
@@ -684,5 +716,66 @@ namespace MQTT_TLS_Bridge
         {
             public override string ToString() => $"{TopicFilter} (QoS {(int)Qos})";
         }
+
+        private static void TrimTextBoxLines(TextBox textBox, int maxLines, int trimBatchLines)
+        {
+            if (textBox.LineCount <= maxLines)
+                return;
+
+            // 초과분만큼 또는 trimBatchLines 중 큰 값만큼 앞에서 제거(배치 삭제)
+            var linesToRemove = Math.Max(textBox.LineCount - maxLines, trimBatchLines);
+
+            // LineIndex는 0-based이고, 마지막 라인 인덱스를 넘기면 예외 가능하니 방어
+            linesToRemove = Math.Min(linesToRemove, Math.Max(0, textBox.LineCount - 1));
+
+            var charIndex = textBox.GetCharacterIndexFromLineIndex(linesToRemove);
+            if (charIndex <= 0)
+                return;
+
+            textBox.Text = textBox.Text.Substring(charIndex);
+        }
+
+        private void ClearClientTopicsButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _clientTopics.Clear();
+                _clientLastByTopic.Clear();
+                ClientTopicListBox.SelectedItem = null;
+                ClientLastMessageTextBox.Text = string.Empty;
+                AppendClientLog("Client topic history cleared.");
+            }
+            catch (Exception ex)
+            {
+                AppendClientLog($"Clear client topics failed: {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
+        private void ClearBrokerTopicsButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _brokerTopics.Clear();
+                _brokerLastByTopic.Clear();
+                TopicListBox.SelectedItem = null;
+                BrokerDataTextBox.Text = string.Empty;
+                AppendBrokerLog("Broker topic history cleared.");
+            }
+            catch (Exception ex)
+            {
+                AppendBrokerLog($"Clear broker topics failed: {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
+        // 옵션: Subscribed Topics clear
+        private void ClearSubscribedTopicsButton_Click(object sender, RoutedEventArgs e)
+        {
+            _subscriptions.Clear();
+            SubscribedTopicListBox.SelectedItem = null;
+
+            AppendClientLog("Subscribed topics cleared.");
+        }
+
+
     }
 }
