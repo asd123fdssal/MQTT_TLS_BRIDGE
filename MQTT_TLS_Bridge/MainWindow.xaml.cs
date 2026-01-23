@@ -23,13 +23,13 @@ namespace MQTT_TLS_Bridge
         private readonly MqttPublisherService _publisherService = new();
         private readonly CancellationTokenSource _cts = new();
 
-        private readonly ObservableCollection<string> _brokerTopics = new();
+        private readonly ObservableCollection<string> _brokerTopics = [];
         private readonly ConcurrentDictionary<string, string> _brokerLastByTopic = new(StringComparer.Ordinal);
 
-        private readonly ObservableCollection<string> _clientTopics = new();
+        private readonly ObservableCollection<string> _clientTopics = [];
         private readonly ConcurrentDictionary<string, string> _clientLastByTopic = new(StringComparer.Ordinal);
 
-        private readonly ObservableCollection<SubscriptionEntry> _subscriptions = new();
+        private readonly ObservableCollection<SubscriptionEntry> _subscriptions = [];
 
         private AppSettings? _lastLoadedSettings;
         private bool _isShuttingDown;
@@ -244,8 +244,7 @@ namespace MQTT_TLS_Bridge
                     ClientCaCertPathTextBox.Text = string.Empty;
             }
 
-            if (ClientBrowseCaButton != null)
-                ClientBrowseCaButton.IsEnabled = isCustomCa;
+            ClientBrowseCaButton?.IsEnabled = isCustomCa;
 
             if (ClientPinnedThumbprintTextBox != null)
             {
@@ -441,8 +440,7 @@ namespace MQTT_TLS_Bridge
                 if (!_brokerTopics.Contains(msg.Topic))
                     _brokerTopics.Add(msg.Topic);
 
-                var selected = TopicListBox.SelectedItem as string;
-                if (selected != null && string.Equals(selected, msg.Topic, StringComparison.Ordinal))
+                if (TopicListBox.SelectedItem is string selected && string.Equals(selected, msg.Topic, StringComparison.Ordinal))
                     BrokerDataTextBox.Text = msg.PayloadText;
             });
         }
@@ -456,8 +454,7 @@ namespace MQTT_TLS_Bridge
                 if (!_clientTopics.Contains(msg.Topic))
                     _clientTopics.Add(msg.Topic);
 
-                var selected = ClientTopicListBox.SelectedItem as string;
-                if (selected != null && string.Equals(selected, msg.Topic, StringComparison.Ordinal))
+                if (ClientTopicListBox.SelectedItem is string selected && string.Equals(selected, msg.Topic, StringComparison.Ordinal))
                     ClientLastMessageTextBox.Text = msg.PayloadText;
             });
         }
@@ -520,8 +517,6 @@ namespace MQTT_TLS_Bridge
 
             if (savePasswords)
             {
-                // PasswordBox가 비어 있으면 기존 값을 유지합니다.
-                // 기존 값은 _lastLoadedSettings에서 가져오되, 없으면 디스크에서 한 번 더 확보합니다.
                 var existingBrokerPwd = _lastLoadedSettings?.Broker?.PfxPassword;
                 var existingClientPwd = _lastLoadedSettings?.Client?.Password;
 
@@ -533,13 +528,9 @@ namespace MQTT_TLS_Bridge
                     ? clientPasswordTyped
                     : existingClientPwd;
 
-                // 그래도 null이면(처음 저장, 기존 파일 없음, 사용자 미입력) 정책을 정해야 합니다.
-                // "저장 ON이면 null 저장은 싫다"라면 빈 문자열로 저장하세요.
-                if (brokerPasswordToSave == null)
-                    brokerPasswordToSave = string.Empty;
+                brokerPasswordToSave ??= string.Empty;
 
-                if (clientPasswordToSave == null)
-                    clientPasswordToSave = string.Empty;
+                clientPasswordToSave ??= string.Empty;
             }
 
             var client = new AppClientSettings
@@ -715,24 +706,6 @@ namespace MQTT_TLS_Bridge
         private sealed record SubscriptionEntry(string TopicFilter, MqttQualityOfServiceLevel Qos)
         {
             public override string ToString() => $"{TopicFilter} (QoS {(int)Qos})";
-        }
-
-        private static void TrimTextBoxLines(TextBox textBox, int maxLines, int trimBatchLines)
-        {
-            if (textBox.LineCount <= maxLines)
-                return;
-
-            // 초과분만큼 또는 trimBatchLines 중 큰 값만큼 앞에서 제거(배치 삭제)
-            var linesToRemove = Math.Max(textBox.LineCount - maxLines, trimBatchLines);
-
-            // LineIndex는 0-based이고, 마지막 라인 인덱스를 넘기면 예외 가능하니 방어
-            linesToRemove = Math.Min(linesToRemove, Math.Max(0, textBox.LineCount - 1));
-
-            var charIndex = textBox.GetCharacterIndexFromLineIndex(linesToRemove);
-            if (charIndex <= 0)
-                return;
-
-            textBox.Text = textBox.Text.Substring(charIndex);
         }
 
         private void ClearClientTopicsButton_Click(object sender, RoutedEventArgs e)
