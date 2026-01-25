@@ -54,24 +54,26 @@ namespace MQTT_TLS_Bridge
             _publisherService.Log += AppendClientLog;
             _publisherService.MessageReceived += OnClientMessageReceived;
 
-            _publisherService.ConnectionStateChanged += (state, detail) =>
+            _publisherService.ConnectionStateChanged += PublisherService_ConnectionStateChanged;
+        }
+
+        private void PublisherService_ConnectionStateChanged(ConnectionState state, string? detail)
+        {
+            Dispatcher.Invoke(() =>
             {
-                Dispatcher.Invoke(() =>
+                ConnStatusText.Text = state.ToString();
+
+                ConnLed.Fill = state switch
                 {
-                    ConnStatusText.Text = state.ToString();
+                    ConnectionState.Connected => new SolidColorBrush(Color.FromRgb(0x2E, 0xCC, 0x71)),
+                    ConnectionState.Connecting => new SolidColorBrush(Color.FromRgb(0xF1, 0xC4, 0x0F)),
+                    ConnectionState.Error => new SolidColorBrush(Color.FromRgb(0xE7, 0x4C, 0x3C)),
+                    _ => new SolidColorBrush(Color.FromRgb(0xEC, 0x2B, 0x13))
+                };
 
-                    ConnLed.Fill = state switch
-                    {
-                        ConnectionState.Connected => new SolidColorBrush(Color.FromRgb(0x2E, 0xCC, 0x71)),
-                        ConnectionState.Connecting => new SolidColorBrush(Color.FromRgb(0xF1, 0xC4, 0x0F)),
-                        ConnectionState.Error => new SolidColorBrush(Color.FromRgb(0xE7, 0x4C, 0x3C)),
-                        _ => new SolidColorBrush(Color.FromRgb(0xEC, 0x2B, 0x13))
-                    };
-
-                    if (state == ConnectionState.Error && !string.IsNullOrWhiteSpace(detail))
-                        AppendClientLog($"Client error: {detail}");
-                });
-            };
+                if (state == ConnectionState.Error && !string.IsNullOrWhiteSpace(detail))
+                    AppendClientLog($"Client error: {detail}");
+            });
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -100,6 +102,9 @@ namespace MQTT_TLS_Bridge
         {
             if (_isShuttingDown)
                 return;
+
+            if (_publisherService != null)
+                _publisherService.ConnectionStateChanged -= PublisherService_ConnectionStateChanged;
 
             _isShuttingDown = true;
             e.Cancel = true;
