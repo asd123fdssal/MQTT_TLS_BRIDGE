@@ -1,10 +1,14 @@
-﻿using System.Collections.Concurrent;
+﻿using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Security.Authentication;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -12,6 +16,7 @@ using Microsoft.Win32;
 using MQTT_TLS_Bridge.Broker;
 using MQTT_TLS_Bridge.Control;
 using MQTT_TLS_Bridge.Enums;
+using MQTT_TLS_Bridge.Logging;
 using MQTT_TLS_Bridge.Publisher;
 using MQTT_TLS_Bridge.Settings;
 using MQTTnet.Protocol;
@@ -49,14 +54,28 @@ namespace MQTT_TLS_Bridge
         private AppSettings? _lastLoadedSettings;
         private bool _isShuttingDown;
 
-        // Log trimming policy
-        private const int MaxLogLines = 200; // 최대 유지 라인
-        private const int TrimLogLines = 100; // 초과 시 한 번에 지울 라인
+        private const int MaxLogLines = 200;
+        private const int TrimLogLines = 100;
         private const int MaxServerLogLines = 300;
         private const int TrimServerLogLines = 150;
 
         private const string ErrBadRequest = "BadRequest";
+
+        private const String LogServerName = "Server";
         private const int DefaultControlPort = 4811;
+
+        private readonly DailyFileLogger _fileLog = new(
+            System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Logs")
+        );
+
+        private Action<string, string>? _onRawReceived;
+        private Action<string, string>? _onRawSent;
+
+        private Action<string>? _onCtrlClientConnected;
+        private Action<string>? _onCtrlClientDisconnected;
+
+        private Action<string, string, string>? _onPacketReceived;
+        private Action<string, string, bool>? _onPacketSent;
 
         public MainWindow()
         {
@@ -118,7 +137,6 @@ namespace MQTT_TLS_Bridge
 
                 ServerPortTextBox.Text = DefaultControlPort.ToString();
 
-                // Auto start via toggle path
                 ServerAllowRemoteCheckBox.IsChecked = false;
                 ServerToggle.IsChecked = true;
             }
@@ -133,8 +151,7 @@ namespace MQTT_TLS_Bridge
             if (_isShuttingDown)
                 return;
 
-            if (_publisherService != null)
-                _publisherService.ConnectionStateChanged -= PublisherService_ConnectionStateChanged;
+            _publisherService.ConnectionStateChanged -= PublisherService_ConnectionStateChanged;
 
             _isShuttingDown = true;
             e.Cancel = true;
@@ -146,10 +163,11 @@ namespace MQTT_TLS_Bridge
         {
             try
             {
-                await StopControlServerAsync();
-                await _cts.CancelAsync();
-                await _publisherService.DisposeAsync();
-                await _brokerService.DisposeAsync();
+                await StopControlServerAsync().ConfigureAwait(false);
+                await _cts.CancelAsync().ConfigureAwait(false);
+
+                await _publisherService.DisposeAsync().ConfigureAwait(false);
+                await _brokerService.DisposeAsync().ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -186,13 +204,20 @@ namespace MQTT_TLS_Bridge
                 {
                     AppendClientLog($"Dispatcher error: {ex.GetType().Name}: {ex.Message}");
                 }
+
+                try
+                {
+                    await _fileLog.DisposeAsync().ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    // 종료 단계에서 파일 로그 정리 실패는 복구 불가이며 앱 종료 흐름을 방해하지 않기 위해 무시합니다.
+                    AppendClientLog($"FileLog dispose error: {ex.GetType().Name}: {ex.Message}");
+                }
             }
         }
 
-        private void ExitButton_Click(object sender, RoutedEventArgs e)
-        {
-            Close();
-        }
+        private void ExitButton_Click(object sender, RoutedEventArgs e) => Close();
 
         private void LoadSettingsButton_Click(object sender, RoutedEventArgs e)
         {
@@ -212,7 +237,6 @@ namespace MQTT_TLS_Bridge
         {
             try
             {
-                // Save 전에 "기존 저장값"을 확보해야 비밀번호가 null로 덮이지 않습니다.
                 if (_lastLoadedSettings == null && SettingsStore.Exists())
                     _lastLoadedSettings = SettingsStore.Load();
 
@@ -309,7 +333,6 @@ namespace MQTT_TLS_Bridge
                 pfxPath = ResolvePath(pfxPath);
 
                 var password = BrokerPfxPasswordBox.Password ?? string.Empty;
-
                 var ssl = ParseSslProtocolsFromUi(BrokerTlsProtocolCombo);
 
                 await _brokerService.StartAsync(pfxPath, password, port, ssl, _cts.Token);
@@ -556,6 +579,7 @@ namespace MQTT_TLS_Bridge
                     MaxLogLines,
                     TrimLogLines
                 );
+                _fileLog.Write("BROKER", message);
             });
         }
 
@@ -569,233 +593,35 @@ namespace MQTT_TLS_Bridge
                     MaxLogLines,
                     TrimLogLines
                 );
+                _fileLog.Write("CLIENT", message);
             });
         }
 
-        private AppSettings BuildSettingsFromUiPreserveSecrets()
+        private void AppendServerLog(string message)
         {
-            var savePasswords = SavePasswordsToggle.IsChecked == true;
-
-            var brokerPasswordTyped = BrokerPfxPasswordBox.Password ?? string.Empty;
-            var clientPasswordTyped = PublisherPassword.Password ?? string.Empty;
-
-            string? brokerPasswordToSave = null;
-            string? clientPasswordToSave = null;
-
-            if (savePasswords)
+            Dispatcher.Invoke(() =>
             {
-                var existingBrokerPwd = _lastLoadedSettings?.Broker?.PfxPassword;
-                var existingClientPwd = _lastLoadedSettings?.Client?.Password;
+                AppendLogLine(
+                    ServerLogTextBox,
+                    $"[{DateTime.Now:HH:mm:ss}] {message}\r\n",
+                    MaxServerLogLines,
+                    TrimServerLogLines
+                );
+                _fileLog.Write(LogServerName, message);
+            });
+        }
 
-                brokerPasswordToSave = !string.IsNullOrWhiteSpace(brokerPasswordTyped)
-                    ? brokerPasswordTyped
-                    : existingBrokerPwd;
-
-                clientPasswordToSave = !string.IsNullOrWhiteSpace(clientPasswordTyped)
-                    ? clientPasswordTyped
-                    : existingClientPwd;
-
-                brokerPasswordToSave ??= string.Empty;
-
-                clientPasswordToSave ??= string.Empty;
+        private void ClearServerLogButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                ServerLogTextBox.Clear();
+                AppendServerLog("Server log cleared.");
             }
-
-            var client = new AppClientSettings
+            catch (Exception ex)
             {
-                Host = PublisherHost.Text?.Trim() ?? "127.0.0.1",
-                Port = ParsePortOrThrow(PublisherPort.Text),
-                ClientId = PublisherClientID.Text?.Trim(),
-                Username = string.IsNullOrWhiteSpace(PublisherUsername.Text)
-                    ? null
-                    : PublisherUsername.Text.Trim(),
-                Password = clientPasswordToSave,
-                UseTls = ClientUseTlsToggle.IsChecked == true,
-                AllowUntrustedCertificates = ClientAllowUntrustedToggle.IsChecked == true,
-                SslProtocolsIndex = ClientTlsProtocolCombo.SelectedIndex,
-                ValidationModeIndex = ClientTlsValidationModeCombo.SelectedIndex,
-                CaCertificatePath = string.IsNullOrWhiteSpace(ClientCaCertPathTextBox.Text)
-                    ? null
-                    : ClientCaCertPathTextBox.Text.Trim(),
-                PinnedThumbprint = string.IsNullOrWhiteSpace(ClientPinnedThumbprintTextBox.Text)
-                    ? null
-                    : ClientPinnedThumbprintTextBox.Text.Trim(),
-                SubTopicFilter = SubTopicFilterTextBox.Text ?? "info/#",
-                SubQosIndex = SubQosCombo.SelectedIndex,
-                PubTopic = PubTopicTextBox.Text ?? "info/delta/sbms",
-                PubPayload = PubPayloadTextBox.Text ?? string.Empty,
-                PubQosIndex = PubQosCombo.SelectedIndex,
-                PubRetain = PubRetainToggle.IsChecked == true,
-            };
-
-            var broker = new BrokerSettings
-            {
-                Port = ParsePortOrThrow(BrokerPortTextBox.Text),
-                PfxPath = BrokerPfxPathTextBox.Text?.Trim() ?? "cert\\devcert.pfx",
-                PfxPassword = brokerPasswordToSave,
-                SslProtocolsIndex = BrokerTlsProtocolCombo.SelectedIndex,
-            };
-
-            return new AppSettings
-            {
-                SavePasswords = savePasswords,
-                Client = client,
-                Broker = broker,
-            };
-        }
-
-        private void ApplySettingsToUi(AppSettings settings)
-        {
-            SavePasswordsToggle.IsChecked = settings.SavePasswords;
-
-            PublisherHost.Text = settings.Client.Host ?? "127.0.0.1";
-            PublisherPort.Text = settings.Client.Port.ToString();
-            PublisherClientID.Text = settings.Client.ClientId ?? string.Empty;
-            PublisherUsername.Text = settings.Client.Username ?? string.Empty;
-
-            PublisherPassword.Password = settings.SavePasswords
-                ? (settings.Client.Password ?? string.Empty)
-                : string.Empty;
-
-            ClientUseTlsToggle.IsChecked = settings.Client.UseTls;
-            ClientAllowUntrustedToggle.IsChecked = settings.Client.AllowUntrustedCertificates;
-
-            ClientTlsProtocolCombo.SelectedIndex = ClampIndex(
-                settings.Client.SslProtocolsIndex,
-                0,
-                2
-            );
-            ClientTlsValidationModeCombo.SelectedIndex = ClampIndex(
-                settings.Client.ValidationModeIndex,
-                0,
-                3
-            );
-
-            ClientCaCertPathTextBox.Text = settings.Client.CaCertificatePath ?? string.Empty;
-            ClientPinnedThumbprintTextBox.Text = settings.Client.PinnedThumbprint ?? string.Empty;
-
-            SubTopicFilterTextBox.Text = settings.Client.SubTopicFilter ?? "info/#";
-            SubQosCombo.SelectedIndex = ClampIndex(settings.Client.SubQosIndex, 0, 2);
-
-            PubTopicTextBox.Text = settings.Client.PubTopic ?? "info/delta/sbms";
-            PubPayloadTextBox.Text = settings.Client.PubPayload ?? string.Empty;
-            PubQosCombo.SelectedIndex = ClampIndex(settings.Client.PubQosIndex, 0, 2);
-            PubRetainToggle.IsChecked = settings.Client.PubRetain;
-
-            BrokerPortTextBox.Text = settings.Broker.Port.ToString();
-            BrokerPfxPathTextBox.Text = settings.Broker.PfxPath ?? "cert\\devcert.pfx";
-            BrokerPfxPasswordBox.Password = settings.SavePasswords
-                ? (settings.Broker.PfxPassword ?? string.Empty)
-                : string.Empty;
-            BrokerTlsProtocolCombo.SelectedIndex = ClampIndex(
-                settings.Broker.SslProtocolsIndex,
-                0,
-                2
-            );
-
-            ApplyTlsValidationModeUi();
-
-            // Subscribed list restore (optional)
-            _subscriptions.Clear();
-        }
-
-        private static int ParsePortOrThrow(string text)
-        {
-            if (!int.TryParse(text?.Trim(), out var port))
-                throw new InvalidOperationException("Port is not a number.");
-
-            if (port < 1 || port > 65535)
-                throw new InvalidOperationException("Port is out of range.");
-
-            return port;
-        }
-
-        private static string BuildClientId(string? uiValue)
-        {
-            var cid = uiValue?.Trim();
-            if (!string.IsNullOrWhiteSpace(cid))
-                return cid;
-
-            return "cli-" + Guid.NewGuid().ToString("N")[..8];
-        }
-
-        private static MqttQualityOfServiceLevel ParseQos(ComboBox combo)
-        {
-            return combo.SelectedIndex switch
-            {
-                1 => MqttQualityOfServiceLevel.AtLeastOnce,
-                2 => MqttQualityOfServiceLevel.ExactlyOnce,
-                _ => MqttQualityOfServiceLevel.AtMostOnce,
-            };
-        }
-
-        private static SslProtocols ParseSslProtocolsFromUi(ComboBox combo)
-        {
-            return combo.SelectedIndex switch
-            {
-                0 => SslProtocols.Tls13,
-                1 => SslProtocols.Tls12,
-                2 => SslProtocols.Tls13 | SslProtocols.Tls12,
-                _ => SslProtocols.Tls13,
-            };
-        }
-
-        private static string ResolvePath(string path)
-        {
-            if (System.IO.Path.IsPathRooted(path))
-                return path;
-
-            return System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, path);
-        }
-
-        private TlsValidationMode GetSelectedValidationMode()
-        {
-            return ClientTlsValidationModeCombo.SelectedIndex switch
-            {
-                1 => TlsValidationMode.AllowUntrusted,
-                2 => TlsValidationMode.CustomCa,
-                3 => TlsValidationMode.ThumbprintPinning,
-                _ => TlsValidationMode.Strict,
-            };
-        }
-
-        private static int ClampIndex(int value, int min, int max)
-        {
-            if (value < min)
-                return min;
-            if (value > max)
-                return min;
-            return value;
-        }
-
-        private void UpsertSubscription(string filter, MqttQualityOfServiceLevel qos)
-        {
-            for (var i = 0; i < _subscriptions.Count; i++)
-            {
-                if (string.Equals(_subscriptions[i].TopicFilter, filter, StringComparison.Ordinal))
-                {
-                    _subscriptions[i] = new SubscriptionEntry(filter, qos);
-                    return;
-                }
+                AppendClientLog($"Clear server log failed: {ex.GetType().Name}: {ex.Message}");
             }
-
-            _subscriptions.Add(new SubscriptionEntry(filter, qos));
-        }
-
-        private void RemoveSubscription(string filter)
-        {
-            for (var i = 0; i < _subscriptions.Count; i++)
-            {
-                if (string.Equals(_subscriptions[i].TopicFilter, filter, StringComparison.Ordinal))
-                {
-                    _subscriptions.RemoveAt(i);
-                    return;
-                }
-            }
-        }
-
-        private sealed record SubscriptionEntry(string TopicFilter, MqttQualityOfServiceLevel Qos)
-        {
-            public override string ToString() => $"{TopicFilter} (QoS {(int)Qos})";
         }
 
         private void ClearClientTopicsButton_Click(object sender, RoutedEventArgs e)
@@ -830,13 +656,156 @@ namespace MQTT_TLS_Bridge
             }
         }
 
-        // 옵션: Subscribed Topics clear
         private void ClearSubscribedTopicsButton_Click(object sender, RoutedEventArgs e)
         {
             _subscriptions.Clear();
             SubscribedTopicListBox.SelectedItem = null;
-
             AppendClientLog("Subscribed topics cleared.");
+        }
+
+        private async void ServerToggle_Checked(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var port = ParsePortOrThrow(ServerPortTextBox.Text);
+                var bind =
+                    ServerAllowRemoteCheckBox.IsChecked == true
+                        ? IPAddress.Any
+                        : IPAddress.Loopback;
+
+                await StartControlServerAsync(bind, port);
+
+                ServerStatusText.Text = $"{bind}:{port}";
+                AppendServerLog($"Control server started on {bind}:{port}");
+            }
+            catch (Exception ex)
+            {
+                AppendServerLog($"Control server start failed: {ex.GetType().Name}: {ex.Message}");
+                ServerToggle.IsChecked = false;
+                ServerStatusText.Text = "Stopped";
+            }
+        }
+
+        private async void ServerToggle_Unchecked(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                await StopControlServerAsync();
+                ServerStatusText.Text = "Stopped";
+                AppendServerLog("Control server stopped.");
+            }
+            catch (Exception ex)
+            {
+                AppendServerLog($"Control server stop failed: {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
+        private async Task StartControlServerAsync(IPAddress bindAddress, int port)
+        {
+            await _serverLifecycleLock.WaitAsync();
+            try
+            {
+                await StopControlServerAsync_NoLock();
+
+                var server = new IniControlServer(bindAddress, port, HandleControlCommandAsync);
+
+                AttachControlServerEvents(server);
+
+                server.Start(_cts.Token);
+
+                _controlServer = server;
+            }
+            finally
+            {
+                _serverLifecycleLock.Release();
+            }
+        }
+
+        private async Task StopControlServerAsync()
+        {
+            await _serverLifecycleLock.WaitAsync();
+            try
+            {
+                await StopControlServerAsync_NoLock();
+            }
+            finally
+            {
+                _serverLifecycleLock.Release();
+            }
+        }
+
+        private async Task StopControlServerAsync_NoLock()
+        {
+            var server = _controlServer;
+            if (server == null)
+                return;
+
+            try
+            {
+                DetachControlServerEvents(server);
+                await server.StopAsync();
+            }
+            catch (Exception ex)
+            {
+                AppendClientLog($"Control server stop error: {ex.GetType().Name}: {ex.Message}");
+            }
+            finally
+            {
+                _controlServer = null;
+            }
+        }
+
+        private void AttachControlServerEvents(IniControlServer server)
+        {
+            _onRawReceived = (remote, raw) => _fileLog.WriteRaw("CTRL", remote, "RX", raw);
+            _onRawSent = (remote, raw) => _fileLog.WriteRaw("CTRL", remote, "TX", raw);
+
+            _onCtrlClientConnected = remote =>
+                _fileLog.Write(LogServerName, $"CTRL client connected remote={remote}");
+            _onCtrlClientDisconnected = remote =>
+                _fileLog.Write(LogServerName, $"CTRL client disconnected remote={remote}");
+
+            _onPacketReceived = (remote, id, cmd) =>
+                _fileLog.Write(LogServerName, $"CTRL REQ remote={remote} id={id} cmd={cmd}");
+            _onPacketSent = (remote, id, ok) =>
+                _fileLog.Write(
+                    LogServerName,
+                    $"CTRL RES remote={remote} id={id} ok={(ok ? "1" : "0")}"
+                );
+
+            server.RawReceived += _onRawReceived;
+            server.RawSent += _onRawSent;
+
+            server.ClientConnected += _onCtrlClientConnected;
+            server.ClientDisconnected += _onCtrlClientDisconnected;
+
+            server.PacketReceived += _onPacketReceived;
+            server.PacketSent += _onPacketSent;
+        }
+
+        private void DetachControlServerEvents(IniControlServer server)
+        {
+            if (_onRawReceived != null)
+                server.RawReceived -= _onRawReceived;
+            if (_onRawSent != null)
+                server.RawSent -= _onRawSent;
+
+            if (_onCtrlClientConnected != null)
+                server.ClientConnected -= _onCtrlClientConnected;
+            if (_onCtrlClientDisconnected != null)
+                server.ClientDisconnected -= _onCtrlClientDisconnected;
+
+            if (_onPacketReceived != null)
+                server.PacketReceived -= _onPacketReceived;
+            if (_onPacketSent != null)
+                server.PacketSent -= _onPacketSent;
+
+            _onRawReceived = null;
+            _onRawSent = null;
+            _onCtrlClientConnected = null;
+            _onCtrlClientDisconnected = null;
+            _onPacketReceived = null;
+            _onPacketSent = null;
         }
 
         private async Task<IniResponse> HandleControlCommandAsync(IniRequest req)
@@ -892,10 +861,10 @@ namespace MQTT_TLS_Bridge
                 || v.Equals("yes", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static MQTTnet.Protocol.MqttQualityOfServiceLevel ReadQosArg(
+        private static MqttQualityOfServiceLevel ReadQosArg(
             Dictionary<string, string> args,
             string key,
-            MQTTnet.Protocol.MqttQualityOfServiceLevel fallback
+            MqttQualityOfServiceLevel fallback
         )
         {
             if (!args.TryGetValue(key, out var v) || string.IsNullOrWhiteSpace(v))
@@ -904,16 +873,16 @@ namespace MQTT_TLS_Bridge
             v = v.Trim();
             return v switch
             {
-                "2" => MQTTnet.Protocol.MqttQualityOfServiceLevel.ExactlyOnce,
-                "1" => MQTTnet.Protocol.MqttQualityOfServiceLevel.AtLeastOnce,
-                _ => MQTTnet.Protocol.MqttQualityOfServiceLevel.AtMostOnce,
+                "2" => MqttQualityOfServiceLevel.ExactlyOnce,
+                "1" => MqttQualityOfServiceLevel.AtLeastOnce,
+                _ => MqttQualityOfServiceLevel.AtMostOnce,
             };
         }
 
-        private static System.Security.Authentication.SslProtocols ReadTlsArg(
+        private static SslProtocols ReadTlsArg(
             Dictionary<string, string> args,
             string key,
-            System.Security.Authentication.SslProtocols fallback
+            SslProtocols fallback
         )
         {
             if (!args.TryGetValue(key, out var v) || string.IsNullOrWhiteSpace(v))
@@ -922,12 +891,10 @@ namespace MQTT_TLS_Bridge
             v = v.Trim();
             return v switch
             {
-                "12" => System.Security.Authentication.SslProtocols.Tls12,
-                "13" => System.Security.Authentication.SslProtocols.Tls13,
-                "12|13" => System.Security.Authentication.SslProtocols.Tls12
-                    | System.Security.Authentication.SslProtocols.Tls13,
-                "13|12" => System.Security.Authentication.SslProtocols.Tls12
-                    | System.Security.Authentication.SslProtocols.Tls13,
+                "12" => SslProtocols.Tls12,
+                "13" => SslProtocols.Tls13,
+                "12|13" => SslProtocols.Tls12 | SslProtocols.Tls13,
+                "13|12" => SslProtocols.Tls12 | SslProtocols.Tls13,
                 _ => fallback,
             };
         }
@@ -960,7 +927,6 @@ namespace MQTT_TLS_Bridge
             pfxPath = ResolvePath(pfxPath);
 
             var password = req.Arguments.TryGetValue("pfxpw", out var pw) ? pw : ui.PfxPw;
-
             var tls = ReadTlsArg(req.Arguments, "tls", ui.Tls);
 
             await _brokerService.StartAsync(pfxPath, password, port, tls, _cts.Token);
@@ -1068,8 +1034,6 @@ namespace MQTT_TLS_Bridge
                     "allowUntrusted",
                     ui.AllowUntrusted
                 ),
-
-                // 강한 프로토콜 정책을 여기서 적용(예: 기본 Tls13)
                 SslProtocols = ReadTlsArg(req.Arguments, "tls", ui.Ssl),
 
                 ValidationMode = ui.ValidationMode,
@@ -1181,18 +1145,13 @@ namespace MQTT_TLS_Bridge
 
         private async Task<IniResponse> CmdClientPublish(IniRequest req)
         {
-            // args: topic, payload or payload_b64, qos(0/1/2), retain(0/1)
             if (
                 !req.Arguments.TryGetValue("topic", out var topic)
                 || string.IsNullOrWhiteSpace(topic)
             )
                 return IniResponse.Failure(req.Id, ErrBadRequest, "topic is missing");
 
-            var qos = ReadQosArg(
-                req.Arguments,
-                "qos",
-                MQTTnet.Protocol.MqttQualityOfServiceLevel.AtMostOnce
-            );
+            var qos = ReadQosArg(req.Arguments, "qos", MqttQualityOfServiceLevel.AtMostOnce);
             var retain = ReadBoolArg(req.Arguments, "retain", false);
 
             string payload = string.Empty;
@@ -1211,7 +1170,6 @@ namespace MQTT_TLS_Bridge
             }
 
             await _publisherService.PublishAsync(topic.Trim(), payload, retain, qos, _cts.Token);
-
             return IniResponse.Success(req.Id);
         }
 
@@ -1226,7 +1184,6 @@ namespace MQTT_TLS_Bridge
             var qos = ReadQosArg(req.Arguments, "qos", MqttQualityOfServiceLevel.AtMostOnce);
 
             await _publisherService.SubscribeAsync(filter.Trim(), qos, _cts.Token);
-
             await UiAsync(() => UpsertSubscription(filter.Trim(), qos));
 
             return IniResponse.Success(req.Id);
@@ -1241,121 +1198,232 @@ namespace MQTT_TLS_Bridge
                 return IniResponse.Failure(req.Id, ErrBadRequest, "filter is missing");
 
             await _publisherService.UnsubscribeAsync(filter.Trim(), _cts.Token);
-
             await UiAsync(() => RemoveSubscription(filter.Trim()));
 
             return IniResponse.Success(req.Id);
         }
 
-        private void AppendServerLog(string message)
+        private AppSettings BuildSettingsFromUiPreserveSecrets()
         {
-            Dispatcher.Invoke(() =>
+            var savePasswords = SavePasswordsToggle.IsChecked == true;
+
+            var brokerPasswordTyped = BrokerPfxPasswordBox.Password ?? string.Empty;
+            var clientPasswordTyped = PublisherPassword.Password ?? string.Empty;
+
+            string? brokerPasswordToSave = null;
+            string? clientPasswordToSave = null;
+
+            if (savePasswords)
             {
-                AppendLogLine(
-                    ServerLogTextBox,
-                    $"[{DateTime.Now:HH:mm:ss}] {message}\r\n",
-                    MaxServerLogLines,
-                    TrimServerLogLines
-                );
-            });
+                var existingBrokerPwd = _lastLoadedSettings?.Broker?.PfxPassword;
+                var existingClientPwd = _lastLoadedSettings?.Client?.Password;
+
+                brokerPasswordToSave = !string.IsNullOrWhiteSpace(brokerPasswordTyped)
+                    ? brokerPasswordTyped
+                    : existingBrokerPwd;
+                clientPasswordToSave = !string.IsNullOrWhiteSpace(clientPasswordTyped)
+                    ? clientPasswordTyped
+                    : existingClientPwd;
+
+                brokerPasswordToSave ??= string.Empty;
+                clientPasswordToSave ??= string.Empty;
+            }
+
+            var client = new AppClientSettings
+            {
+                Host = PublisherHost.Text?.Trim() ?? "127.0.0.1",
+                Port = ParsePortOrThrow(PublisherPort.Text),
+                ClientId = PublisherClientID.Text?.Trim(),
+                Username = string.IsNullOrWhiteSpace(PublisherUsername.Text)
+                    ? null
+                    : PublisherUsername.Text.Trim(),
+                Password = clientPasswordToSave,
+                UseTls = ClientUseTlsToggle.IsChecked == true,
+                AllowUntrustedCertificates = ClientAllowUntrustedToggle.IsChecked == true,
+                SslProtocolsIndex = ClientTlsProtocolCombo.SelectedIndex,
+                ValidationModeIndex = ClientTlsValidationModeCombo.SelectedIndex,
+                CaCertificatePath = string.IsNullOrWhiteSpace(ClientCaCertPathTextBox.Text)
+                    ? null
+                    : ClientCaCertPathTextBox.Text.Trim(),
+                PinnedThumbprint = string.IsNullOrWhiteSpace(ClientPinnedThumbprintTextBox.Text)
+                    ? null
+                    : ClientPinnedThumbprintTextBox.Text.Trim(),
+                SubTopicFilter = SubTopicFilterTextBox.Text ?? "info/#",
+                SubQosIndex = SubQosCombo.SelectedIndex,
+                PubTopic = PubTopicTextBox.Text ?? "info/delta/sbms",
+                PubPayload = PubPayloadTextBox.Text ?? string.Empty,
+                PubQosIndex = PubQosCombo.SelectedIndex,
+                PubRetain = PubRetainToggle.IsChecked == true,
+            };
+
+            var broker = new BrokerSettings
+            {
+                Port = ParsePortOrThrow(BrokerPortTextBox.Text),
+                PfxPath = BrokerPfxPathTextBox.Text?.Trim() ?? "cert\\devcert.pfx",
+                PfxPassword = brokerPasswordToSave,
+                SslProtocolsIndex = BrokerTlsProtocolCombo.SelectedIndex,
+            };
+
+            return new AppSettings
+            {
+                SavePasswords = savePasswords,
+                Client = client,
+                Broker = broker,
+            };
         }
 
-        private void ClearServerLogButton_Click(object sender, RoutedEventArgs e)
+        private void ApplySettingsToUi(AppSettings settings)
         {
-            try
+            SavePasswordsToggle.IsChecked = settings.SavePasswords;
+
+            PublisherHost.Text = settings.Client.Host ?? "127.0.0.1";
+            PublisherPort.Text = settings.Client.Port.ToString();
+            PublisherClientID.Text = settings.Client.ClientId ?? string.Empty;
+            PublisherUsername.Text = settings.Client.Username ?? string.Empty;
+
+            PublisherPassword.Password = settings.SavePasswords
+                ? (settings.Client.Password ?? string.Empty)
+                : string.Empty;
+
+            ClientUseTlsToggle.IsChecked = settings.Client.UseTls;
+            ClientAllowUntrustedToggle.IsChecked = settings.Client.AllowUntrustedCertificates;
+
+            ClientTlsProtocolCombo.SelectedIndex = ClampIndex(
+                settings.Client.SslProtocolsIndex,
+                0,
+                2
+            );
+            ClientTlsValidationModeCombo.SelectedIndex = ClampIndex(
+                settings.Client.ValidationModeIndex,
+                0,
+                3
+            );
+
+            ClientCaCertPathTextBox.Text = settings.Client.CaCertificatePath ?? string.Empty;
+            ClientPinnedThumbprintTextBox.Text = settings.Client.PinnedThumbprint ?? string.Empty;
+
+            SubTopicFilterTextBox.Text = settings.Client.SubTopicFilter ?? "info/#";
+            SubQosCombo.SelectedIndex = ClampIndex(settings.Client.SubQosIndex, 0, 2);
+
+            PubTopicTextBox.Text = settings.Client.PubTopic ?? "info/delta/sbms";
+            PubPayloadTextBox.Text = settings.Client.PubPayload ?? string.Empty;
+            PubQosCombo.SelectedIndex = ClampIndex(settings.Client.PubQosIndex, 0, 2);
+            PubRetainToggle.IsChecked = settings.Client.PubRetain;
+
+            BrokerPortTextBox.Text = settings.Broker.Port.ToString();
+            BrokerPfxPathTextBox.Text = settings.Broker.PfxPath ?? "cert\\devcert.pfx";
+            BrokerPfxPasswordBox.Password = settings.SavePasswords
+                ? (settings.Broker.PfxPassword ?? string.Empty)
+                : string.Empty;
+            BrokerTlsProtocolCombo.SelectedIndex = ClampIndex(
+                settings.Broker.SslProtocolsIndex,
+                0,
+                2
+            );
+
+            ApplyTlsValidationModeUi();
+
+            _subscriptions.Clear();
+        }
+
+        private static int ParsePortOrThrow(string text)
+        {
+            if (!int.TryParse(text?.Trim(), out var port))
+                throw new InvalidOperationException("Port is not a number.");
+
+            if (port < 1 || port > 65535)
+                throw new InvalidOperationException("Port is out of range.");
+
+            return port;
+        }
+
+        private static string BuildClientId(string? uiValue)
+        {
+            var cid = uiValue?.Trim();
+            if (!string.IsNullOrWhiteSpace(cid))
+                return cid;
+
+            return "cli-" + Guid.NewGuid().ToString("N")[..8];
+        }
+
+        private static MqttQualityOfServiceLevel ParseQos(ComboBox combo)
+        {
+            return combo.SelectedIndex switch
             {
-                ServerLogTextBox.Clear();
-                AppendServerLog("Server log cleared.");
+                1 => MqttQualityOfServiceLevel.AtLeastOnce,
+                2 => MqttQualityOfServiceLevel.ExactlyOnce,
+                _ => MqttQualityOfServiceLevel.AtMostOnce,
+            };
+        }
+
+        private static SslProtocols ParseSslProtocolsFromUi(ComboBox combo)
+        {
+            return combo.SelectedIndex switch
+            {
+                0 => SslProtocols.Tls13,
+                1 => SslProtocols.Tls12,
+                2 => SslProtocols.Tls13 | SslProtocols.Tls12,
+                _ => SslProtocols.Tls13,
+            };
+        }
+
+        private static string ResolvePath(string path)
+        {
+            if (System.IO.Path.IsPathRooted(path))
+                return path;
+
+            return System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, path);
+        }
+
+        private TlsValidationMode GetSelectedValidationMode()
+        {
+            return ClientTlsValidationModeCombo.SelectedIndex switch
+            {
+                1 => TlsValidationMode.AllowUntrusted,
+                2 => TlsValidationMode.CustomCa,
+                3 => TlsValidationMode.ThumbprintPinning,
+                _ => TlsValidationMode.Strict,
+            };
+        }
+
+        private static int ClampIndex(int value, int min, int max)
+        {
+            if (value < min)
+                return min;
+            if (value > max)
+                return min;
+            return value;
+        }
+
+        private void UpsertSubscription(string filter, MqttQualityOfServiceLevel qos)
+        {
+            for (var i = 0; i < _subscriptions.Count; i++)
+            {
+                if (string.Equals(_subscriptions[i].TopicFilter, filter, StringComparison.Ordinal))
+                {
+                    _subscriptions[i] = new SubscriptionEntry(filter, qos);
+                    return;
+                }
             }
-            catch (Exception ex)
+
+            _subscriptions.Add(new SubscriptionEntry(filter, qos));
+        }
+
+        private void RemoveSubscription(string filter)
+        {
+            for (var i = 0; i < _subscriptions.Count; i++)
             {
-                AppendClientLog($"Clear server log failed: {ex.GetType().Name}: {ex.Message}");
+                if (string.Equals(_subscriptions[i].TopicFilter, filter, StringComparison.Ordinal))
+                {
+                    _subscriptions.RemoveAt(i);
+                    return;
+                }
             }
         }
 
-        private async void ServerToggle_Checked(object sender, RoutedEventArgs e)
+        private sealed record SubscriptionEntry(string TopicFilter, MqttQualityOfServiceLevel Qos)
         {
-            try
-            {
-                var port = ParsePortOrThrow(ServerPortTextBox.Text);
-                var bind =
-                    ServerAllowRemoteCheckBox.IsChecked == true
-                        ? IPAddress.Any
-                        : IPAddress.Loopback;
-
-                await StartControlServerAsync(bind, port);
-
-                ServerStatusText.Text = $"{bind}:{port}";
-                AppendServerLog($"Control server started on {bind}:{port}");
-            }
-            catch (Exception ex)
-            {
-                AppendServerLog($"Control server start failed: {ex.GetType().Name}: {ex.Message}");
-                ServerToggle.IsChecked = false;
-                ServerStatusText.Text = "Stopped";
-            }
-        }
-
-        private async void ServerToggle_Unchecked(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                await StopControlServerAsync();
-                ServerStatusText.Text = "Stopped";
-                AppendServerLog("Control server stopped.");
-            }
-            catch (Exception ex)
-            {
-                AppendServerLog($"Control server stop failed: {ex.GetType().Name}: {ex.Message}");
-            }
-        }
-
-        private async Task StartControlServerAsync(IPAddress bindAddress, int port)
-        {
-            await _serverLifecycleLock.WaitAsync();
-            try
-            {
-                await StopControlServerAsync_NoLock();
-
-                _controlServer = new IniControlServer(bindAddress, port, HandleControlCommandAsync);
-                _controlServer.Start(_cts.Token);
-            }
-            finally
-            {
-                _serverLifecycleLock.Release();
-            }
-        }
-
-        private async Task StopControlServerAsync()
-        {
-            await _serverLifecycleLock.WaitAsync();
-            try
-            {
-                await StopControlServerAsync_NoLock();
-            }
-            finally
-            {
-                _serverLifecycleLock.Release();
-            }
-        }
-
-        private async Task StopControlServerAsync_NoLock()
-        {
-            if (_controlServer == null)
-                return;
-
-            try
-            {
-                await _controlServer.StopAsync();
-            }
-            catch (Exception ex)
-            {
-                AppendClientLog($"Control server stop error: {ex.GetType().Name}: {ex.Message}");
-            }
-            finally
-            {
-                _controlServer = null;
-            }
+            public override string ToString() => $"{TopicFilter} (QoS {(int)Qos})";
         }
     }
 }
