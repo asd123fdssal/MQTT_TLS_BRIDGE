@@ -1,14 +1,10 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
+﻿using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Security.Authentication;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -60,8 +56,7 @@ namespace MQTT_TLS_Bridge
         private const int TrimServerLogLines = 150;
 
         private const string ErrBadRequest = "BadRequest";
-
-        private const String LogServerName = "Server";
+        private const string LogServerName = "Server";
         private const int DefaultControlPort = 4811;
 
         private readonly DailyFileLogger _fileLog = new(
