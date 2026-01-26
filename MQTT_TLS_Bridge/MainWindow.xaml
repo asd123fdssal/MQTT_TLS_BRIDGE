@@ -1,527 +1,680 @@
-﻿<Window x:Class="MQTT_TLS_Bridge.MainWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-        xmlns:local="clr-namespace:MQTT_TLS_Bridge"
-        mc:Ignorable="d"
-        Title="MQTT TLS Tester" Height="650" Width="1200"
-        Loaded="Window_Loaded"
-        Closing="Window_Closing">
+﻿<Window
+  x:Class="MQTT_TLS_Bridge.MainWindow"
+  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+  xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+  xmlns:local="clr-namespace:MQTT_TLS_Bridge"
+  mc:Ignorable="d"
+  Title="MQTT TLS Tester"
+  Height="650"
+  Width="1200"
+  Loaded="Window_Loaded"
+  Closing="Window_Closing"
+>
+  <Grid Background="{DynamicResource WindowBackgroundBrush}" d:Background="#1E1E1E">
+    <TabControl Margin="16">
+      <!-- Client -->
+      <TabItem>
+        <TabItem.Header>
+          <StackPanel Orientation="Horizontal">
+            <ui:SymbolIcon Margin="0,0,6,0" Symbol="PlugConnected24" />
+            <TextBlock Text="Client" />
+          </StackPanel>
+        </TabItem.Header>
 
-    <Grid Background="{DynamicResource WindowBackgroundBrush}"
-          d:Background="#1E1E1E">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="430" />
+            <ColumnDefinition Width="8" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
 
-        <TabControl Margin="16">
+          <!-- Left: Connection + Subscribe + Publish -->
+          <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+              <Grid Margin="4,0,4,0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="8" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-            <!-- Client -->
-            <TabItem>
-                <TabItem.Header>
-                    <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Margin="0,0,6,0" Symbol="PlugConnected24" />
-                        <TextBlock Text="Client" />
-                    </StackPanel>
-                </TabItem.Header>
+                <Label Grid.Column="0" VerticalAlignment="Center">Connection</Label>
 
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="430"/>
-                        <ColumnDefinition Width="8"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
+                <ui:Button
+                  Grid.Column="1"
+                  x:Name="LoadSettingsButton"
+                  Content="Load"
+                  Click="LoadSettingsButton_Click"
+                />
 
-                    <!-- Left: Connection + Subscribe + Publish -->
-                    <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto">
-                        <StackPanel>
+                <ui:Button
+                  Grid.Column="3"
+                  x:Name="SaveSettingsButton"
+                  Content="Save"
+                  Click="SaveSettingsButton_Click"
+                />
+              </Grid>
 
-                            <Grid Margin="4,0,4,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="8"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
+              <Grid Margin="4,0,4,0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="110" />
+                </Grid.ColumnDefinitions>
 
-                                <Label Grid.Column="0" VerticalAlignment="Center">Connection</Label>
+                <ui:TextBox
+                  x:Name="PublisherHost"
+                  Grid.Column="0"
+                  Margin="0,0,8,0"
+                  PlaceholderText="Host"
+                  Text="127.0.0.1"
+                />
 
-                                <ui:Button Grid.Column="1"
-                                           x:Name="LoadSettingsButton"
-                                           Content="Load"
-                                           Click="LoadSettingsButton_Click"/>
+                <ui:TextBox
+                  x:Name="PublisherPort"
+                  Grid.Column="1"
+                  PlaceholderText="Port"
+                  Text="8883"
+                />
+              </Grid>
 
-                                <ui:Button Grid.Column="3"
-                                           x:Name="SaveSettingsButton"
-                                           Content="Save"
-                                           Click="SaveSettingsButton_Click"/>
-                            </Grid>
+              <ui:TextBox
+                x:Name="PublisherClientID"
+                Margin="4,4,4,0"
+                PlaceholderText="ClientID"
+                Text="ClientID"
+              />
 
-                            <Grid Margin="4,0,4,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="110"/>
-                                </Grid.ColumnDefinitions>
+              <Grid Margin="4,4,4,0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
 
-                                <ui:TextBox x:Name="PublisherHost"
-                                            Grid.Column="0"
-                                            Margin="0,0,8,0"
-                                            PlaceholderText="Host"
-                                            Text="127.0.0.1"/>
+                <ui:TextBox
+                  x:Name="PublisherUsername"
+                  Grid.Column="0"
+                  Margin="0,0,8,0"
+                  PlaceholderText="Username"
+                  Text=""
+                />
 
-                                <ui:TextBox x:Name="PublisherPort"
-                                            Grid.Column="1"
-                                            PlaceholderText="Port"
-                                            Text="8883"/>
-                            </Grid>
+                <ui:PasswordBox
+                  x:Name="PublisherPassword"
+                  Grid.Column="1"
+                  PlaceholderText="Password"
+                  Icon="Password24"
+                />
+              </Grid>
 
-                            <ui:TextBox x:Name="PublisherClientID"
-                                        Margin="4,4,4,0"
-                                        PlaceholderText="ClientID"
-                                        Text="ClientID"/>
+              <ui:ToggleSwitch
+                x:Name="SavePasswordsToggle"
+                Margin="4,6,4,0"
+                OffContent="Do not save passwords"
+                OnContent="Save passwords"
+                IsChecked="False"
+                Height="20"
+                Width="210"
+              />
 
-                            <Grid Margin="4,4,4,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
+              <Grid Margin="4,8,4,0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
 
-                                <ui:TextBox x:Name="PublisherUsername"
-                                            Grid.Column="0"
-                                            Margin="0,0,8,0"
-                                            PlaceholderText="Username"
-                                            Text=""/>
+                <ui:ToggleSwitch
+                  x:Name="ClientUseTlsToggle"
+                  Grid.Column="0"
+                  Margin="0,0,12,0"
+                  OffContent="TLS Off"
+                  OnContent="TLS On"
+                  IsChecked="True"
+                  Height="20"
+                  Width="110"
+                />
 
-                                <ui:PasswordBox x:Name="PublisherPassword"
-                                                Grid.Column="1"
-                                                PlaceholderText="Password"
-                                                Icon="Password24"/>
-                            </Grid>
+                <ui:ToggleSwitch
+                  x:Name="ClientAllowUntrustedToggle"
+                  Grid.Column="1"
+                  Margin="0,0,12,0"
+                  OffContent="Verify"
+                  OnContent="Allow Untrusted"
+                  IsChecked="False"
+                  Height="20"
+                  Width="150"
+                />
 
-                            <ui:ToggleSwitch x:Name="SavePasswordsToggle"
-                                             Margin="4,6,4,0"
-                                             OffContent="Do not save passwords"
-                                             OnContent="Save passwords"
-                                             IsChecked="False"
-                                             Height="20"
-                                             Width="210"/>
+                <ComboBox x:Name="ClientTlsProtocolCombo" Grid.Column="2" SelectedIndex="0">
+                  <ComboBoxItem Content="TLS 1.3" />
+                  <ComboBoxItem Content="TLS 1.2" />
+                  <ComboBoxItem Content="TLS 1.3 + 1.2" />
+                </ComboBox>
+              </Grid>
 
-                            <Grid Margin="4,8,4,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
+              <Label Margin="4,10,0,0">TLS Validation</Label>
 
-                                <ui:ToggleSwitch x:Name="ClientUseTlsToggle"
-                                                 Grid.Column="0"
-                                                 Margin="0,0,12,0"
-                                                 OffContent="TLS Off"
-                                                 OnContent="TLS On"
-                                                 IsChecked="True"
-                                                 Height="20"
-                                                 Width="110"/>
+              <ComboBox
+                x:Name="ClientTlsValidationModeCombo"
+                Margin="4,0,4,0"
+                SelectedIndex="0"
+                SelectionChanged="ClientTlsValidationModeCombo_SelectionChanged"
+              >
+                <ComboBoxItem Content="Strict (OS trust + name match)" />
+                <ComboBoxItem Content="Allow Untrusted (accept any)" />
+                <ComboBoxItem Content="Custom CA (file)" />
+                <ComboBoxItem Content="Thumbprint Pinning" />
+              </ComboBox>
 
-                                <ui:ToggleSwitch x:Name="ClientAllowUntrustedToggle"
-                                                 Grid.Column="1"
-                                                 Margin="0,0,12,0"
-                                                 OffContent="Verify"
-                                                 OnContent="Allow Untrusted"
-                                                 IsChecked="False"
-                                                 Height="20"
-                                                 Width="150"/>
+              <Grid Margin="4,4,4,0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="8" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-                                <ComboBox x:Name="ClientTlsProtocolCombo"
-                                          Grid.Column="2"
-                                          SelectedIndex="0">
-                                    <ComboBoxItem Content="TLS 1.3"/>
-                                    <ComboBoxItem Content="TLS 1.2"/>
-                                    <ComboBoxItem Content="TLS 1.3 + 1.2"/>
-                                </ComboBox>
-                            </Grid>
+                <ui:TextBox
+                  x:Name="ClientCaCertPathTextBox"
+                  Grid.Column="0"
+                  PlaceholderText="CA certificate path (CER/PEM)"
+                  IsEnabled="False"
+                />
 
-                            <Label Margin="4,10,0,0">TLS Validation</Label>
+                <ui:Button
+                  x:Name="ClientBrowseCaButton"
+                  Grid.Column="2"
+                  Content="Browse"
+                  IsEnabled="False"
+                  Click="ClientBrowseCaButton_Click"
+                />
+              </Grid>
 
-                            <ComboBox x:Name="ClientTlsValidationModeCombo"
-                                      Margin="4,0,4,0"
-                                      SelectedIndex="0"
-                                      SelectionChanged="ClientTlsValidationModeCombo_SelectionChanged">
-                                <ComboBoxItem Content="Strict (OS trust + name match)"/>
-                                <ComboBoxItem Content="Allow Untrusted (accept any)"/>
-                                <ComboBoxItem Content="Custom CA (file)"/>
-                                <ComboBoxItem Content="Thumbprint Pinning"/>
-                            </ComboBox>
+              <ui:TextBox
+                x:Name="ClientPinnedThumbprintTextBox"
+                Margin="4,4,4,0"
+                PlaceholderText="Pinned thumbprint (hex, no spaces)"
+                IsEnabled="False"
+              />
 
-                            <Grid Margin="4,4,4,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="8"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
+              <Grid Margin="4,8,4,0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" MinWidth="55" />
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-                                <ui:TextBox x:Name="ClientCaCertPathTextBox"
-                                            Grid.Column="0"
-                                            PlaceholderText="CA certificate path (CER/PEM)"
-                                            IsEnabled="False"/>
+                <Label Grid.Column="0" VerticalAlignment="Center">Status</Label>
 
-                                <ui:Button x:Name="ClientBrowseCaButton"
-                                           Grid.Column="2"
-                                           Content="Browse"
-                                           IsEnabled="False"
-                                           Click="ClientBrowseCaButton_Click"/>
-                            </Grid>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                  <Ellipse
+                    x:Name="ConnLed"
+                    Width="10"
+                    Height="10"
+                    Margin="0,0,8,0"
+                    Fill="#ec2b13"
+                  />
+                  <TextBlock
+                    x:Name="ConnStatusText"
+                    Text="Disconnected"
+                    VerticalAlignment="Center"
+                  />
+                </StackPanel>
 
-                            <ui:TextBox x:Name="ClientPinnedThumbprintTextBox"
-                                        Margin="4,4,4,0"
-                                        PlaceholderText="Pinned thumbprint (hex, no spaces)"
-                                        IsEnabled="False"/>
+                <ui:ToggleSwitch
+                  x:Name="PublisherConnect"
+                  Grid.Column="2"
+                  OffContent="Disconnect"
+                  OnContent="Connect"
+                  Height="20"
+                  Width="120"
+                  Checked="PublisherConnect_Checked"
+                  Unchecked="PublisherConnect_Unchecked"
+                />
+              </Grid>
 
-                            <Grid Margin="4,8,4,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" MinWidth="55"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
+              <Separator Margin="4,10,4,10" />
 
-                                <Label Grid.Column="0" VerticalAlignment="Center">Status</Label>
+              <Label Margin="4,0,0,0">Subscribe</Label>
 
-                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Ellipse x:Name="ConnLed"
-                                             Width="10" Height="10"
-                                             Margin="0,0,8,0"
-                                             Fill="#ec2b13"/>
-                                    <TextBlock x:Name="ConnStatusText"
-                                               Text="Disconnected"
-                                               VerticalAlignment="Center"/>
-                                </StackPanel>
+              <ui:TextBox
+                x:Name="SubTopicFilterTextBox"
+                Margin="4,0,4,0"
+                PlaceholderText="Topic filter (e.g. info/#)"
+                Text="info/#"
+              />
 
-                                <ui:ToggleSwitch x:Name="PublisherConnect"
-                                                 Grid.Column="2"
-                                                 OffContent="Disconnect"
-                                                 OnContent="Connect"
-                                                 Height="20"
-                                                 Width="120"
-                                                 Checked="PublisherConnect_Checked"
-                                                 Unchecked="PublisherConnect_Unchecked"/>
-                            </Grid>
+              <Grid Margin="4,4,4,0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-                            <Separator Margin="4,10,4,10"/>
+                <ComboBox x:Name="SubQosCombo" Grid.Column="0" Margin="0,0,8,0" SelectedIndex="0">
+                  <ComboBoxItem Content="QoS 0" />
+                  <ComboBoxItem Content="QoS 1" />
+                  <ComboBoxItem Content="QoS 2" />
+                </ComboBox>
 
-                            <Label Margin="4,0,0,0">Subscribe</Label>
+                <ui:Button
+                  x:Name="SubscribeButton"
+                  Grid.Column="1"
+                  Content="Subscribe"
+                  Click="SubscribeButton_Click"
+                />
+              </Grid>
 
-                            <ui:TextBox x:Name="SubTopicFilterTextBox"
-                                        Margin="4,0,4,0"
-                                        PlaceholderText="Topic filter (e.g. info/#)"
-                                        Text="info/#"/>
+              <ui:Button
+                x:Name="UnsubscribeButton"
+                Margin="4,4,4,0"
+                Content="Unsubscribe"
+                Click="UnsubscribeButton_Click"
+              />
 
-                            <Grid Margin="4,4,4,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
+              <!-- Added -->
+              <Label Margin="4,10,0,0">Subscribed Topics</Label>
+              <ListBox
+                x:Name="SubscribedTopicListBox"
+                Margin="4,0,4,0"
+                Height="130"
+                SelectionChanged="SubscribedTopicListBox_SelectionChanged"
+              />
 
-                                <ComboBox x:Name="SubQosCombo"
-                                          Grid.Column="0"
-                                          Margin="0,0,8,0"
-                                          SelectedIndex="0">
-                                    <ComboBoxItem Content="QoS 0"/>
-                                    <ComboBoxItem Content="QoS 1"/>
-                                    <ComboBoxItem Content="QoS 2"/>
-                                </ComboBox>
+              <Separator Margin="4,10,4,10" />
 
-                                <ui:Button x:Name="SubscribeButton"
-                                           Grid.Column="1"
-                                           Content="Subscribe"
-                                           Click="SubscribeButton_Click"/>
-                            </Grid>
+              <Label Margin="4,0,0,0">Publish</Label>
 
-                            <ui:Button x:Name="UnsubscribeButton"
-                                       Margin="4,4,4,0"
-                                       Content="Unsubscribe"
-                                       Click="UnsubscribeButton_Click"/>
+              <ui:TextBox
+                x:Name="PubTopicTextBox"
+                Margin="4,0,4,0"
+                PlaceholderText="Topic"
+                Text="info/delta/sbms"
+              />
 
-                            <!-- Added -->
-                            <Grid Margin="4,10,4,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
+              <TextBox
+                x:Name="PubPayloadTextBox"
+                Margin="4,4,4,0"
+                AcceptsReturn="True"
+                TextWrapping="Wrap"
+                VerticalScrollBarVisibility="Auto"
+                HorizontalScrollBarVisibility="Auto"
+                Height="160"
+              />
 
-                                <Label Grid.Column="0">Subscribed Topics</Label>
-                                <ui:Button Grid.Column="1"
-                                           Content="Clear"
-                                           Click="ClearSubscribedTopicsButton_Click" />
-                            </Grid>
+              <Grid Margin="4,4,4,0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-                            <ListBox x:Name="SubscribedTopicListBox"
-                                     Margin="4,0,4,0"
-                                     Height="130"
-                                     SelectionChanged="SubscribedTopicListBox_SelectionChanged"/>
+                <ComboBox x:Name="PubQosCombo" Grid.Column="0" Margin="0,0,8,0" SelectedIndex="0">
+                  <ComboBoxItem Content="QoS 0" />
+                  <ComboBoxItem Content="QoS 1" />
+                  <ComboBoxItem Content="QoS 2" />
+                </ComboBox>
 
-                            <Separator Margin="4,10,4,10"/>
+                <ui:ToggleSwitch
+                  x:Name="PubRetainToggle"
+                  Grid.Column="1"
+                  OffContent="Retain Off"
+                  OnContent="Retain On"
+                  Width="120"
+                />
+              </Grid>
 
-                            <Label Margin="4,0,0,0">Publish</Label>
+              <ui:Button
+                x:Name="PublishButton"
+                Margin="4,8,4,0"
+                Content="Publish"
+                Click="PublishButton_Click"
+              />
+            </StackPanel>
+          </ScrollViewer>
 
-                            <ui:TextBox x:Name="PubTopicTextBox"
-                                        Margin="4,0,4,0"
-                                        PlaceholderText="Topic"
-                                        Text="info/delta/sbms"/>
+          <Border Grid.Column="1" />
 
-                            <TextBox x:Name="PubPayloadTextBox"
-                                     Margin="4,4,4,0"
-                                     AcceptsReturn="True"
-                                     TextWrapping="Wrap"
-                                     VerticalScrollBarVisibility="Auto"
-                                     HorizontalScrollBarVisibility="Auto"
-                                     Height="160"/>
+          <!-- Right: Received + Client Log -->
+          <Grid Grid.Column="2">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="*" />
+              <RowDefinition Height="8" />
+              <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
 
-                            <Grid Margin="4,4,4,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
+            <Grid Grid.Row="0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="260" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
 
-                                <ComboBox x:Name="PubQosCombo"
-                                          Grid.Column="0"
-                                          Margin="0,0,8,0"
-                                          SelectedIndex="0">
-                                    <ComboBoxItem Content="QoS 0"/>
-                                    <ComboBoxItem Content="QoS 1"/>
-                                    <ComboBoxItem Content="QoS 2"/>
-                                </ComboBox>
+              <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
 
-                                <ui:ToggleSwitch x:Name="PubRetainToggle"
-                                                 Grid.Column="1"
-                                                 OffContent="Retain Off"
-                                                 OnContent="Retain On"
-                                                 Width="120"/>
-                            </Grid>
+                <Grid Grid.Row="0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
 
-                            <ui:Button x:Name="PublishButton"
-                                       Margin="4,8,4,0"
-                                       Content="Publish"
-                                       Click="PublishButton_Click"/>
-
-                        </StackPanel>
-                    </ScrollViewer>
-
-                    <Border Grid.Column="1"/>
-
-                    <!-- Right: Received + Client Log -->
-                    <Grid Grid.Column="2">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="*"/>
-                            <RowDefinition Height="8"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
-
-                        <Grid Grid.Row="0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="260"/>
-                                <ColumnDefinition Width="8"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-
-                            <Grid Grid.Column="0">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                </Grid.RowDefinitions>
-
-                                <Grid Grid.Row="0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-
-                                    <Label Grid.Column="0">Received Topics</Label>
-                                    <ui:Button Grid.Column="1"
-                                               Content="Clear"
-                                               Click="ClearClientTopicsButton_Click" />
-                                </Grid>
-
-                                <ListBox Grid.Row="1"
-                                         x:Name="ClientTopicListBox"
-                                         SelectionChanged="ClientTopicListBox_SelectionChanged"/>
-                            </Grid>
-
-                            <Border Grid.Column="1"/>
-
-                            <Grid Grid.Column="2">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                </Grid.RowDefinitions>
-
-                                <Label Grid.Row="0">Last Message</Label>
-                                <TextBox Grid.Row="1"
-                                         x:Name="ClientLastMessageTextBox"
-                                         IsReadOnly="True"
-                                         TextWrapping="Wrap"
-                                         VerticalScrollBarVisibility="Auto"
-                                         HorizontalScrollBarVisibility="Auto"/>
-                            </Grid>
-                        </Grid>
-
-                        <Grid Grid.Row="2">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-
-                            <Label Grid.Row="0">Client Log</Label>
-                            <TextBox Grid.Row="1"
-                                     x:Name="ClientLogTextBox"
-                                     IsReadOnly="True"
-                                     TextWrapping="Wrap"
-                                     VerticalScrollBarVisibility="Auto"
-                                     HorizontalScrollBarVisibility="Auto"/>
-                        </Grid>
-                    </Grid>
+                  <Label Grid.Column="0">Received Topics</Label>
+                  <ui:Button
+                    Grid.Column="1"
+                    Content="Clear"
+                    Click="ClearClientTopicsButton_Click"
+                  />
                 </Grid>
-            </TabItem>
+                <ListBox
+                  Grid.Row="1"
+                  x:Name="ClientTopicListBox"
+                  SelectionChanged="ClientTopicListBox_SelectionChanged"
+                />
+              </Grid>
 
-            <!-- Broker -->
-            <TabItem>
-                <TabItem.Header>
-                    <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Margin="0,0,6,0" Symbol="Server24" />
-                        <TextBlock Text="Broker" />
-                    </StackPanel>
-                </TabItem.Header>
+              <Border Grid.Column="1" />
 
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="8"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
+              <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
 
-                    <Grid Grid.Row="0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="110"/>
-                            <ColumnDefinition Width="8"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="8"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="8"/>
-                            <ColumnDefinition Width="180"/>
-                            <ColumnDefinition Width="8"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="8"/>
-                            <ColumnDefinition Width="140"/>
-                            <ColumnDefinition Width="8"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
+                <Label Grid.Row="0">Last Message</Label>
+                <TextBox
+                  Grid.Row="1"
+                  x:Name="ClientLastMessageTextBox"
+                  IsReadOnly="True"
+                  TextWrapping="Wrap"
+                  VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Auto"
+                />
+              </Grid>
+            </Grid>
 
-                        <ui:TextBox x:Name="BrokerPortTextBox"
-                                    Grid.Column="0"
-                                    PlaceholderText="Port"
-                                    Text="8883"/>
+            <Grid Grid.Row="2">
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+              </Grid.RowDefinitions>
 
-                        <ui:ToggleSwitch x:Name="BrokerToggle"
-                                         Grid.Column="2"
-                                         OffContent="Close"
-                                         OnContent="Open"
-                                         Height="20"
-                                         Width="90"
-                                         Checked="BrokerToggle_Checked"
-                                         Unchecked="BrokerToggle_Unchecked"/>
+              <Label Grid.Row="0">Client Log</Label>
+              <TextBox
+                Grid.Row="1"
+                x:Name="ClientLogTextBox"
+                IsReadOnly="True"
+                TextWrapping="Wrap"
+                VerticalScrollBarVisibility="Auto"
+                HorizontalScrollBarVisibility="Auto"
+              />
+            </Grid>
+          </Grid>
+        </Grid>
+      </TabItem>
 
-                        <ui:TextBox x:Name="BrokerPfxPathTextBox"
-                                    Grid.Column="4"
-                                    PlaceholderText="PFX path"
-                                    Text="cert\devcert.pfx"/>
+      <!-- Broker -->
+      <TabItem>
+        <TabItem.Header>
+          <StackPanel Orientation="Horizontal">
+            <ui:SymbolIcon Margin="0,0,6,0" Symbol="Server24" />
+            <TextBlock Text="Broker" />
+          </StackPanel>
+        </TabItem.Header>
 
-                        <ui:Button x:Name="BrokerBrowsePfxButton"
-                                   Grid.Column="6"
-                                   Content="Browse"
-                                   Click="BrokerBrowsePfxButton_Click"/>
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="8" />
+            <RowDefinition Height="*" />
+          </Grid.RowDefinitions>
 
-                        <ui:PasswordBox x:Name="BrokerPfxPasswordBox"
-                                        Grid.Column="8"
-                                        PlaceholderText="PFX password"
-                                        Icon="Password24"
-                                        MinWidth="150"/>
+          <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="110" />
+              <ColumnDefinition Width="8" />
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="8" />
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="8" />
+              <ColumnDefinition Width="180" />
+              <ColumnDefinition Width="8" />
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="8" />
+              <ColumnDefinition Width="140" />
+              <ColumnDefinition Width="8" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
 
-                        <ComboBox x:Name="BrokerTlsProtocolCombo"
-                                  Grid.Column="10"
-                                  SelectedIndex="0">
-                            <ComboBoxItem Content="TLS 1.3"/>
-                            <ComboBoxItem Content="TLS 1.2"/>
-                            <ComboBoxItem Content="TLS 1.3 + 1.2"/>
-                        </ComboBox>
+            <ui:TextBox
+              x:Name="BrokerPortTextBox"
+              Grid.Column="0"
+              PlaceholderText="Port"
+              Text="8883"
+            />
 
-                        <ui:Button x:Name="ExitButton"
-                                   Grid.Column="12"
-                                   Icon="{ui:SymbolIcon Symbol=ArrowExit20}"
-                                   Content="Exit"
-                                   Click="ExitButton_Click"/>
-                    </Grid>
+            <ui:ToggleSwitch
+              x:Name="BrokerToggle"
+              Grid.Column="2"
+              OffContent="Close"
+              OnContent="Open"
+              Height="20"
+              Width="90"
+              Checked="BrokerToggle_Checked"
+              Unchecked="BrokerToggle_Unchecked"
+            />
 
-                    <Border Grid.Row="1"/>
+            <ui:TextBox
+              x:Name="BrokerPfxPathTextBox"
+              Grid.Column="4"
+              PlaceholderText="PFX path"
+              Text="cert\devcert.pfx"
+            />
 
-                    <Grid Grid.Row="2">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="300"/>
-                            <ColumnDefinition Width="8"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
+            <ui:Button
+              x:Name="BrokerBrowsePfxButton"
+              Grid.Column="6"
+              Content="Browse"
+              Click="BrokerBrowsePfxButton_Click"
+            />
 
-                        <Grid Grid.Column="0">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
+            <ui:PasswordBox
+              x:Name="BrokerPfxPasswordBox"
+              Grid.Column="8"
+              PlaceholderText="PFX password"
+              Icon="Password24"
+              MinWidth="150"
+            />
 
-                            <Grid Grid.Row="0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
+            <ComboBox x:Name="BrokerTlsProtocolCombo" Grid.Column="10" SelectedIndex="0">
+              <ComboBoxItem Content="TLS 1.3" />
+              <ComboBoxItem Content="TLS 1.2" />
+              <ComboBoxItem Content="TLS 1.3 + 1.2" />
+            </ComboBox>
 
-                                <Label Grid.Column="0">Topic List</Label>
-                                <ui:Button Grid.Column="1"
-                                           Content="Clear"
-                                           Click="ClearBrokerTopicsButton_Click" />
-                            </Grid>
+            <ui:Button
+              x:Name="ExitButton"
+              Grid.Column="12"
+              Icon="{ui:SymbolIcon Symbol=ArrowExit20}"
+              Content="Exit"
+              Click="ExitButton_Click"
+            />
+          </Grid>
 
-                            <ListBox Grid.Row="1"
-                                     x:Name="TopicListBox"
-                                     SelectionChanged="TopicListBox_SelectionChanged"/>
-                        </Grid>
+          <Border Grid.Row="1" />
 
-                        <Border Grid.Column="1"/>
+          <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="300" />
+              <ColumnDefinition Width="8" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
 
-                        <Grid Grid.Column="2">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="120"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
+            <Grid Grid.Column="0">
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+              </Grid.RowDefinitions>
 
-                            <Label Grid.Row="0">Topic Data</Label>
-                            <TextBox x:Name="BrokerDataTextBox"
-                                     Grid.Row="1"
-                                     IsReadOnly="True"
-                                     TextWrapping="Wrap"
-                                     VerticalScrollBarVisibility="Auto"
-                                     HorizontalScrollBarVisibility="Auto"
-                                     Margin="0,4,0,0"/>
+              <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-                            <Label Grid.Row="2" Margin="0,8,0,0">Log</Label>
-                            <TextBox x:Name="BrokerLogTextBox"
-                                     Grid.Row="3"
-                                     IsReadOnly="True"
-                                     TextWrapping="Wrap"
-                                     VerticalScrollBarVisibility="Auto"
-                                     HorizontalScrollBarVisibility="Auto"
-                                     Margin="0,4,0,0"/>
-                        </Grid>
-                    </Grid>
-                </Grid>
-            </TabItem>
+                <Label Grid.Column="0">Topic List</Label>
+                <ui:Button Grid.Column="1" Content="Clear" Click="ClearBrokerTopicsButton_Click" />
+              </Grid>
+              <ListBox
+                Grid.Row="1"
+                x:Name="TopicListBox"
+                SelectionChanged="TopicListBox_SelectionChanged"
+              />
+            </Grid>
 
-        </TabControl>
-    </Grid>
+            <Border Grid.Column="1" />
+
+            <Grid Grid.Column="2">
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="120" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+              </Grid.RowDefinitions>
+
+              <Label Grid.Row="0">Topic Data</Label>
+              <TextBox
+                x:Name="BrokerDataTextBox"
+                Grid.Row="1"
+                IsReadOnly="True"
+                TextWrapping="Wrap"
+                VerticalScrollBarVisibility="Auto"
+                HorizontalScrollBarVisibility="Auto"
+                Margin="0,4,0,0"
+              />
+
+              <Label Grid.Row="2" Margin="0,8,0,0">Log</Label>
+              <TextBox
+                x:Name="BrokerLogTextBox"
+                Grid.Row="3"
+                IsReadOnly="True"
+                TextWrapping="Wrap"
+                VerticalScrollBarVisibility="Auto"
+                HorizontalScrollBarVisibility="Auto"
+                Margin="0,4,0,0"
+              />
+            </Grid>
+          </Grid>
+        </Grid>
+      </TabItem>
+
+      <!-- Left: controls -->
+      <TabItem>
+        <TabItem.Header>
+          <StackPanel Orientation="Horizontal">
+            <ui:SymbolIcon Margin="0,0,6,0" Symbol="Server24" />
+            <TextBlock Text="Server" />
+          </StackPanel>
+        </TabItem.Header>
+        <Grid Margin="12">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="340" />
+            <ColumnDefinition Width="12" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+
+          <!-- Left: controls -->
+          <Border Grid.Column="0" Padding="12" CornerRadius="8">
+            <StackPanel>
+              <TextBlock
+                FontWeight="SemiBold"
+                FontSize="14"
+                Text="Control Server"
+                Margin="0,0,0,10"
+              />
+
+              <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,10">
+                <TextBlock Width="110" VerticalAlignment="Center" Text="Enabled" />
+                <ToggleButton
+                  x:Name="ServerToggle"
+                  Content="Start / Stop"
+                  Checked="ServerToggle_Checked"
+                  Unchecked="ServerToggle_Unchecked"
+                  Width="160"
+                />
+              </StackPanel>
+
+              <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,10">
+                <TextBlock Width="110" VerticalAlignment="Center" Text="Port" />
+                <TextBox x:Name="ServerPortTextBox" Width="160" />
+              </StackPanel>
+
+              <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,10">
+                <TextBlock Width="110" VerticalAlignment="Center" Text="Bind" />
+                <CheckBox
+                  x:Name="ServerAllowRemoteCheckBox"
+                  Content="Allow remote (0.0.0.0)"
+                  VerticalAlignment="Center"
+                />
+              </StackPanel>
+
+              <Separator Margin="0,8,0,8" />
+
+              <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,10">
+                <TextBlock Width="110" VerticalAlignment="Center" Text="Status" />
+                <TextBlock x:Name="ServerStatusText" Text="Stopped" VerticalAlignment="Center" />
+              </StackPanel>
+
+              <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Width="110" VerticalAlignment="Center" Text="Last cmd" />
+                <TextBlock
+                  x:Name="ServerLastCommandText"
+                  Text="-"
+                  VerticalAlignment="Center"
+                  TextTrimming="CharacterEllipsis"
+                />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+          <!-- Right: log -->
+          <Grid Grid.Column="2">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="8" />
+              <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <DockPanel Grid.Row="0">
+              <TextBlock
+                DockPanel.Dock="Left"
+                FontWeight="SemiBold"
+                FontSize="14"
+                Text="Server Log"
+              />
+              <Button
+                DockPanel.Dock="Right"
+                Content="Clear"
+                Click="ClearServerLogButton_Click"
+                Width="90"
+              />
+            </DockPanel>
+
+            <TextBox
+              Grid.Row="2"
+              x:Name="ServerLogTextBox"
+              IsReadOnly="True"
+              AcceptsReturn="True"
+              TextWrapping="NoWrap"
+              VerticalScrollBarVisibility="Auto"
+              HorizontalScrollBarVisibility="Auto"
+            />
+          </Grid>
+        </Grid>
+      </TabItem>
+    </TabControl>
+  </Grid>
 </Window>

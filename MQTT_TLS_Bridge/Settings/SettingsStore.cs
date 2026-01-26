@@ -19,15 +19,17 @@ namespace MQTT_TLS_Bridge.Settings
 
         public static bool Exists() => File.Exists(SettingsPath);
 
+        private static readonly JsonSerializerOptions JsonIndentedOptions = new()
+        {
+            WriteIndented = true,
+        };
+
         public static void Save(AppSettings settings)
         {
             var dir = Path.GetDirectoryName(SettingsPath)!;
             Directory.CreateDirectory(dir);
 
-            var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
+            var json = JsonSerializer.Serialize(settings, JsonIndentedOptions);
 
             File.WriteAllText(SettingsPath, json);
         }
@@ -40,10 +42,9 @@ namespace MQTT_TLS_Bridge.Settings
 
             var json = File.ReadAllText(path);
 
-            var settings = JsonSerializer.Deserialize<AppSettings>(json);
-            if (settings == null)
-                throw new InvalidOperationException("Settings file is invalid.");
-
+            var settings =
+                JsonSerializer.Deserialize<AppSettings>(json)
+                ?? throw new InvalidOperationException("Settings file is invalid.");
             settings.Client ??= new ClientSettings();
             settings.Broker ??= new BrokerSettings();
 

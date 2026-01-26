@@ -7,7 +7,7 @@ namespace MQTT_TLS_Bridge.Publisher
         Strict = 0,
         AllowUntrusted = 1,
         CustomCa = 2,
-        ThumbprintPinning = 3
+        ThumbprintPinning = 3,
     }
 
     public sealed class PublisherConnectionSettings

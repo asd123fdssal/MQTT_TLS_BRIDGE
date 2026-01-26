@@ -10,7 +10,8 @@ namespace MQTT_TLS_Bridge.Utils
                 pfxPath,
                 password,
                 X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.PersistKeySet,
-                loaderLimits: null);
+                loaderLimits: null
+            );
         }
 
         public static X509Certificate2 LoadPkcs12FromBytes(byte[] pfxBytes, string? password)
@@ -19,7 +20,8 @@ namespace MQTT_TLS_Bridge.Utils
                 pfxBytes,
                 password,
                 X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.PersistKeySet,
-                loaderLimits: null);
+                loaderLimits: null
+            );
         }
 
         public static X509Certificate2 LoadCertificateFromFile(string certPath)

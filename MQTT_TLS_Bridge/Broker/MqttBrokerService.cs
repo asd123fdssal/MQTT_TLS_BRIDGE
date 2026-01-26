@@ -1,10 +1,10 @@
-﻿using MQTTnet.Server;
-using System.Buffers;
+﻿using System.Buffers;
 using System.Net;
 using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using MQTTnet.Server;
 
 namespace MQTT_TLS_Bridge.Broker
 {
@@ -17,7 +17,13 @@ namespace MQTT_TLS_Bridge.Broker
         public event Action<string>? Log;
         public event Action<BrokerMessage>? MessageReceived;
 
-        public async Task StartAsync(string pfxPath, string pfxPassword, int port, SslProtocols sslProtocols, CancellationToken cancellationToken)
+        public async Task StartAsync(
+            string pfxPath,
+            string pfxPassword,
+            int port,
+            SslProtocols sslProtocols,
+            CancellationToken cancellationToken
+        )
         {
             if (IsRunning)
             {
@@ -32,7 +38,8 @@ namespace MQTT_TLS_Bridge.Broker
                 pfxPath,
                 pfxPassword,
                 X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.PersistKeySet,
-                loaderLimits: null);
+                loaderLimits: null
+            );
 
             if (!cert.HasPrivateKey)
                 throw new CryptographicException("PFX does not contain a private key.");
@@ -40,7 +47,9 @@ namespace MQTT_TLS_Bridge.Broker
             var rsa = cert.GetRSAPrivateKey();
             var ecdsa = cert.GetECDsaPrivateKey();
             if (rsa == null && ecdsa == null)
-                throw new CryptographicException("Private key is not accessible (RSA/ECDSA key is null).");
+                throw new CryptographicException(
+                    "Private key is not accessible (RSA/ECDSA key is null)."
+                );
 
             var serverFactory = new MqttServerFactory();
 
@@ -116,12 +125,14 @@ namespace MQTT_TLS_Bridge.Broker
                 var topic = e.ApplicationMessage.Topic;
                 var payloadText = DecodePayloadAsUtf8(e.ApplicationMessage.Payload);
 
-                MessageReceived?.Invoke(new BrokerMessage
-                {
-                    Topic = topic,
-                    PayloadText = payloadText,
-                    ReceivedAtUtc = DateTime.UtcNow
-                });
+                MessageReceived?.Invoke(
+                    new BrokerMessage
+                    {
+                        Topic = topic,
+                        PayloadText = payloadText,
+                        ReceivedAtUtc = DateTime.UtcNow,
+                    }
+                );
 
                 WriteLog($"Publish intercepted: ClientId={e.ClientId}, Topic={topic}");
                 return Task.CompletedTask;

@@ -1,9 +1,9 @@
-﻿using MQTT_TLS_Bridge.Enums;
-using MQTTnet;
-using MQTTnet.Protocol;
-using System.Buffers;
+﻿using System.Buffers;
 using System.Security.Authentication;
 using System.Text;
+using MQTT_TLS_Bridge.Enums;
+using MQTTnet;
+using MQTTnet.Protocol;
 
 namespace MQTT_TLS_Bridge.Publisher
 {
@@ -21,7 +21,10 @@ namespace MQTT_TLS_Bridge.Publisher
         public event Action<ConnectionState, string?>? ConnectionStateChanged;
         public event Action<PublisherMessage>? MessageReceived;
 
-        public async Task ConnectAsync(PublisherConnectionSettings settings, CancellationToken cancellationToken)
+        public async Task ConnectAsync(
+            PublisherConnectionSettings settings,
+            CancellationToken cancellationToken
+        )
         {
             if (IsConnected)
             {
@@ -64,7 +67,13 @@ namespace MQTT_TLS_Bridge.Publisher
             }
         }
 
-        public async Task PublishAsync(string topic, string payloadText, bool retain, MqttQualityOfServiceLevel qos, CancellationToken cancellationToken)
+        public async Task PublishAsync(
+            string topic,
+            string payloadText,
+            bool retain,
+            MqttQualityOfServiceLevel qos,
+            CancellationToken cancellationToken
+        )
         {
             EnsureConnected();
 
@@ -79,7 +88,11 @@ namespace MQTT_TLS_Bridge.Publisher
             WriteLog($"Published: Topic={topic}, QoS={qos}, Retain={retain}");
         }
 
-        public async Task SubscribeAsync(string topic, MqttQualityOfServiceLevel qos, CancellationToken cancellationToken)
+        public async Task SubscribeAsync(
+            string topic,
+            MqttQualityOfServiceLevel qos,
+            CancellationToken cancellationToken
+        )
         {
             EnsureConnected();
 
@@ -143,7 +156,7 @@ namespace MQTT_TLS_Bridge.Publisher
             }
         }
 
-        private MqttClientOptions BuildOptions(PublisherConnectionSettings settings)
+        private static MqttClientOptions BuildOptions(PublisherConnectionSettings settings)
         {
             var tlsBuilder = new MqttClientTlsOptionsBuilder()
                 .UseTls(settings.UseTls)
@@ -166,12 +179,19 @@ namespace MQTT_TLS_Bridge.Publisher
                 .WithTlsOptions(tls);
 
             if (!string.IsNullOrWhiteSpace(settings.Username))
-                optionsBuilder = optionsBuilder.WithCredentials(settings.Username, settings.Password);
+                optionsBuilder = optionsBuilder.WithCredentials(
+                    settings.Username,
+                    settings.Password
+                );
 
             return optionsBuilder.Build();
         }
 
-        private async Task DoConnectAsync(IMqttClient client, MqttClientOptions options, CancellationToken ct)
+        private async Task DoConnectAsync(
+            IMqttClient client,
+            MqttClientOptions options,
+            CancellationToken ct
+        )
         {
             try
             {
@@ -209,9 +229,12 @@ namespace MQTT_TLS_Bridge.Publisher
 
         private void UnregisterClientEventHandlers(IMqttClient client)
         {
-            if (_onConnected != null) client.ConnectedAsync -= _onConnected;
-            if (_onDisconnected != null) client.DisconnectedAsync -= _onDisconnected;
-            if (_onMessageReceived != null) client.ApplicationMessageReceivedAsync -= _onMessageReceived;
+            if (_onConnected != null)
+                client.ConnectedAsync -= _onConnected;
+            if (_onDisconnected != null)
+                client.DisconnectedAsync -= _onDisconnected;
+            if (_onMessageReceived != null)
+                client.ApplicationMessageReceivedAsync -= _onMessageReceived;
         }
 
         private Task OnConnectedAsync(MqttClientConnectedEventArgs e)
@@ -236,12 +259,14 @@ namespace MQTT_TLS_Bridge.Publisher
             var topic = e.ApplicationMessage.Topic;
             var payloadText = DecodePayloadAsUtf8(e.ApplicationMessage.Payload);
 
-            MessageReceived?.Invoke(new PublisherMessage
-            {
-                Topic = topic,
-                PayloadText = payloadText,
-                ReceivedAtUtc = DateTime.UtcNow
-            });
+            MessageReceived?.Invoke(
+                new PublisherMessage
+                {
+                    Topic = topic,
+                    PayloadText = payloadText,
+                    ReceivedAtUtc = DateTime.UtcNow,
+                }
+            );
 
             WriteLog($"Received: Topic={topic}");
             return Task.CompletedTask;
@@ -266,6 +291,7 @@ namespace MQTT_TLS_Bridge.Publisher
 
         private void WriteLog(string message) => Log?.Invoke(message);
 
-        private void SetState(ConnectionState state, string? detail) => ConnectionStateChanged?.Invoke(state, detail);
+        private void SetState(ConnectionState state, string? detail) =>
+            ConnectionStateChanged?.Invoke(state, detail);
     }
 }
