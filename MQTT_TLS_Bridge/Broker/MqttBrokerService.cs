@@ -10,6 +10,7 @@ namespace MQTT_TLS_Bridge.Broker
     public sealed class MqttBrokerService : IAsyncDisposable
     {
         private MqttServer? _server;
+        private X509Certificate2? _certificate;
 
         public bool IsRunning => _server?.IsStarted == true;
 
@@ -32,20 +33,29 @@ namespace MQTT_TLS_Bridge.Broker
                 return;
             }
 
+            if (_server != null)
+                DisposeServer();
+
             if (string.IsNullOrWhiteSpace(pfxPath))
                 throw new InvalidOperationException("PFX path is empty.");
 
             var cert = CertUtil.LoadPkcs12FromFile(pfxPath, pfxPassword);
 
             if (!cert.HasPrivateKey)
+            {
+                cert.Dispose();
                 throw new CryptographicException("PFX does not contain a private key.");
+            }
 
             var rsa = cert.GetRSAPrivateKey();
             var ecdsa = cert.GetECDsaPrivateKey();
             if (rsa == null && ecdsa == null)
+            {
+                cert.Dispose();
                 throw new CryptographicException(
                     "Private key is not accessible (RSA/ECDSA key is null)."
                 );
+            }
 
             var serverFactory = new MqttServerFactory();
 
@@ -60,11 +70,19 @@ namespace MQTT_TLS_Bridge.Broker
                 .Build();
 
             _server = serverFactory.CreateMqttServer(options);
+            _certificate = cert;
             RegisterServerEventHandlers(_server);
 
-            cancellationToken.ThrowIfCancellationRequested();
-
-            await _server.StartAsync();
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                await _server.StartAsync();
+            }
+            catch
+            {
+                DisposeServer();
+                throw;
+            }
 
             WriteLog($"Broker started on mqtts://localhost:{port} ({sslProtocols}).");
         }
@@ -87,6 +105,7 @@ namespace MQTT_TLS_Bridge.Broker
 
             await _server.StopAsync();
             WriteLog("Broker stopped.");
+            DisposeServer();
         }
 
         public async ValueTask DisposeAsync()
@@ -100,9 +119,29 @@ namespace MQTT_TLS_Bridge.Broker
                 }
                 finally
                 {
+                    DisposeServer();
+                }
+            }
+        }
+
+        private void DisposeServer()
+        {
+            if (_server != null)
+            {
+                try
+                {
                     _server.Dispose();
+                }
+                finally
+                {
                     _server = null;
                 }
+            }
+
+            if (_certificate != null)
+            {
+                _certificate.Dispose();
+                _certificate = null;
             }
         }
 
