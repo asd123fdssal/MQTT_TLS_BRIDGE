@@ -22,6 +22,7 @@ namespace MQTT_TLS_Bridge.Logging
             _logDir = logDir ?? throw new ArgumentNullException(nameof(logDir));
             Directory.CreateDirectory(_logDir);
 
+            // Single reader ensures log ordering; allow multiple writers from UI/worker threads.
             _ch = Channel.CreateUnbounded<string>(
                 new UnboundedChannelOptions { SingleReader = true, SingleWriter = false }
             );
@@ -32,6 +33,7 @@ namespace MQTT_TLS_Bridge.Logging
 
         public void Write(string category, string message)
         {
+            // Best-effort enqueue; failures are handled in worker/Dispose paths.
             var ts = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
             _ch.Writer.TryWrite($"{ts} [{category}] {message}");
         }
@@ -70,6 +72,7 @@ namespace MQTT_TLS_Bridge.Logging
         {
             try
             {
+                // Drain channel until cancellation to preserve log ordering.
                 while (await _ch.Reader.WaitToReadAsync(_cts.Token).ConfigureAwait(false))
                 {
                     while (_ch.Reader.TryRead(out var line))
@@ -139,6 +142,7 @@ namespace MQTT_TLS_Bridge.Logging
 
             try
             {
+                // Open log file in append mode with UTF-8 (no BOM) for easy parsing.
                 _writer = new StreamWriter(
                     path,
                     append: true,

@@ -12,6 +12,7 @@ namespace MQTT_TLS_Bridge.Settings
         {
             get
             {
+                // Store settings under the app base directory to avoid user profile ambiguity.
                 var dir = Path.Combine(AppContext.BaseDirectory, ConfigFolderName);
                 return Path.Combine(dir, FileName);
             }
@@ -29,6 +30,7 @@ namespace MQTT_TLS_Bridge.Settings
             var dir = Path.GetDirectoryName(SettingsPath)!;
             Directory.CreateDirectory(dir);
 
+            // Persist with indentation to keep settings readable for manual inspection.
             var json = JsonSerializer.Serialize(settings, JsonIndentedOptions);
 
             File.WriteAllText(SettingsPath, json);
@@ -50,6 +52,7 @@ namespace MQTT_TLS_Bridge.Settings
 
             if (!settings.SavePasswords)
             {
+                // Drop sensitive secrets when the user opted out of saving passwords.
                 settings.Client.Password = null;
                 settings.Broker.PfxPassword = null;
             }
