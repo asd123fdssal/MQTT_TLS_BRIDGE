@@ -13,6 +13,7 @@ namespace MQTT_TLS_Bridge.Control
         private readonly int _port;
         private readonly Func<IniRequest, Task<IniResponse>> _handler;
 
+        // Listener lifecycle is managed by Start/Stop and can be reset across runs.
         private TcpListener? _listener;
         private CancellationTokenSource? _internalCts;
         private Task? _acceptLoopTask;
@@ -48,6 +49,7 @@ namespace MQTT_TLS_Bridge.Control
             if (_listener != null)
                 return;
 
+            // Link to the external token so we can stop on application shutdown.
             _internalCts = CancellationTokenSource.CreateLinkedTokenSource(externalToken);
 
             _listener = new TcpListener(_bindAddress, _port);
@@ -170,6 +172,7 @@ namespace MQTT_TLS_Bridge.Control
                     }
                 )
                 {
+                    // Process packets until the client disconnects or shutdown is requested.
                     while (!token.IsCancellationRequested)
                     {
                         var lines = await ReadPacketLinesAsync(reader, token).ConfigureAwait(false);

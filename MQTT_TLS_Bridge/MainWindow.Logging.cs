@@ -60,12 +60,14 @@ namespace MQTT_TLS_Bridge
         {
             Dispatcher.Invoke(() =>
             {
+                // Keep UI log size bounded to avoid unbounded memory growth.
                 AppendLogLine(
                     textBox,
                     $"[{DateTime.Now:HH:mm:ss}] {message}\r\n",
                     maxLines,
                     trimLines
                 );
+                // Persist log lines to the daily file logger for diagnostics.
                 _fileLog.Write(logName, message);
             });
         }
