@@ -533,35 +533,49 @@ namespace MQTT_TLS_Bridge
 
         private void OnBrokerMessageReceived(BrokerMessage msg)
         {
-            _brokerLastByTopic[msg.Topic] = msg.PayloadText;
-
-            Dispatcher.Invoke(() =>
-            {
-                if (!_brokerTopics.Contains(msg.Topic))
-                    _brokerTopics.Add(msg.Topic);
-
-                if (
-                    TopicListBox.SelectedItem is string selected
-                    && string.Equals(selected, msg.Topic, StringComparison.Ordinal)
-                )
-                    BrokerDataTextBox.Text = msg.PayloadText;
-            });
+            UpdateTopicMessage(
+                _brokerLastByTopic,
+                _brokerTopics,
+                TopicListBox,
+                BrokerDataTextBox,
+                msg.Topic,
+                msg.PayloadText
+            );
         }
 
         private void OnClientMessageReceived(PublisherMessage msg)
         {
-            _clientLastByTopic[msg.Topic] = msg.PayloadText;
+            UpdateTopicMessage(
+                _clientLastByTopic,
+                _clientTopics,
+                ClientTopicListBox,
+                ClientLastMessageTextBox,
+                msg.Topic,
+                msg.PayloadText
+            );
+        }
+
+        private void UpdateTopicMessage(
+            ConcurrentDictionary<string, string> lastByTopic,
+            ObservableCollection<string> topics,
+            ListBox listBox,
+            TextBox lastMessageTextBox,
+            string topic,
+            string payloadText
+        )
+        {
+            lastByTopic[topic] = payloadText;
 
             Dispatcher.Invoke(() =>
             {
-                if (!_clientTopics.Contains(msg.Topic))
-                    _clientTopics.Add(msg.Topic);
+                if (!topics.Contains(topic))
+                    topics.Add(topic);
 
                 if (
-                    ClientTopicListBox.SelectedItem is string selected
-                    && string.Equals(selected, msg.Topic, StringComparison.Ordinal)
+                    listBox.SelectedItem is string selected
+                    && string.Equals(selected, topic, StringComparison.Ordinal)
                 )
-                    ClientLastMessageTextBox.Text = msg.PayloadText;
+                    lastMessageTextBox.Text = payloadText;
             });
         }
 
@@ -597,43 +611,36 @@ namespace MQTT_TLS_Bridge
 
         private void AppendBrokerLog(string message)
         {
-            Dispatcher.Invoke(() =>
-            {
-                AppendLogLine(
-                    BrokerLogTextBox,
-                    $"[{DateTime.Now:HH:mm:ss}] {message}\r\n",
-                    MaxLogLines,
-                    TrimLogLines
-                );
-                _fileLog.Write("BROKER", message);
-            });
+            AppendLog("BROKER", BrokerLogTextBox, message, MaxLogLines, TrimLogLines);
         }
 
         private void AppendClientLog(string message)
         {
-            Dispatcher.Invoke(() =>
-            {
-                AppendLogLine(
-                    ClientLogTextBox,
-                    $"[{DateTime.Now:HH:mm:ss}] {message}\r\n",
-                    MaxLogLines,
-                    TrimLogLines
-                );
-                _fileLog.Write("CLIENT", message);
-            });
+            AppendLog("CLIENT", ClientLogTextBox, message, MaxLogLines, TrimLogLines);
         }
 
         private void AppendServerLog(string message)
         {
+            AppendLog(LogServerName, ServerLogTextBox, message, MaxServerLogLines, TrimServerLogLines);
+        }
+
+        private void AppendLog(
+            string logName,
+            TextBox textBox,
+            string message,
+            int maxLines,
+            int trimLines
+        )
+        {
             Dispatcher.Invoke(() =>
             {
                 AppendLogLine(
-                    ServerLogTextBox,
+                    textBox,
                     $"[{DateTime.Now:HH:mm:ss}] {message}\r\n",
-                    MaxServerLogLines,
-                    TrimServerLogLines
+                    maxLines,
+                    trimLines
                 );
-                _fileLog.Write(LogServerName, message);
+                _fileLog.Write(logName, message);
             });
         }
 

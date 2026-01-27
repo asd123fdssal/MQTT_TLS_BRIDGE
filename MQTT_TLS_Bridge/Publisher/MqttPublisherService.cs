@@ -1,7 +1,6 @@
-﻿using System.Buffers;
-using System.Security.Authentication;
-using System.Text;
+﻿using System.Security.Authentication;
 using MQTT_TLS_Bridge.Enums;
+using MQTT_TLS_Bridge.Utils;
 using MQTTnet;
 using MQTTnet.Protocol;
 
@@ -26,6 +25,8 @@ namespace MQTT_TLS_Bridge.Publisher
             CancellationToken cancellationToken
         )
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             if (IsConnected)
             {
                 WriteLog("Client already connected.");
@@ -160,7 +161,7 @@ namespace MQTT_TLS_Bridge.Publisher
         {
             var tlsBuilder = new MqttClientTlsOptionsBuilder()
                 .UseTls(settings.UseTls)
-                .WithSslProtocols(SslProtocols.Tls13);
+                .WithSslProtocols(settings.SslProtocols);
 
             if (settings.AllowUntrustedCertificates)
             {
@@ -207,6 +208,12 @@ namespace MQTT_TLS_Bridge.Publisher
                     WriteLog($"Connect rejected: {reason}");
                     throw new InvalidOperationException($"Connect rejected: {reason}");
                 }
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                SetState(ConnectionState.Disconnected, "Canceled");
+                WriteLog("Connect canceled.");
+                throw;
             }
             catch (Exception ex)
             {
@@ -257,7 +264,7 @@ namespace MQTT_TLS_Bridge.Publisher
         private Task OnMessageReceivedAsync(MqttApplicationMessageReceivedEventArgs e)
         {
             var topic = e.ApplicationMessage.Topic;
-            var payloadText = DecodePayloadAsUtf8(e.ApplicationMessage.Payload);
+            var payloadText = PayloadUtf8.Decode(e.ApplicationMessage.Payload);
 
             MessageReceived?.Invoke(
                 new PublisherMessage
@@ -270,17 +277,6 @@ namespace MQTT_TLS_Bridge.Publisher
 
             WriteLog($"Received: Topic={topic}");
             return Task.CompletedTask;
-        }
-
-        private static string DecodePayloadAsUtf8(ReadOnlySequence<byte> payload)
-        {
-            if (payload.IsEmpty)
-                return "(empty)";
-
-            if (payload.IsSingleSegment)
-                return Encoding.UTF8.GetString(payload.FirstSpan);
-
-            return Encoding.UTF8.GetString(payload.ToArray());
         }
 
         private void EnsureConnected()
