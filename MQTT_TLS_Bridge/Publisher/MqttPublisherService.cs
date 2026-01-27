@@ -1,7 +1,10 @@
-﻿using System.Security.Authentication;
+﻿using System.Net.Security;
+using System.Security.Authentication;
+using System.Security.Cryptography.X509Certificates;
 using MQTT_TLS_Bridge.Enums;
 using MQTT_TLS_Bridge.Utils;
 using MQTTnet;
+using MQTTnet.Client;
 using MQTTnet.Protocol;
 
 namespace MQTT_TLS_Bridge.Publisher
@@ -159,17 +162,25 @@ namespace MQTT_TLS_Bridge.Publisher
 
         private static MqttClientOptions BuildOptions(PublisherConnectionSettings settings)
         {
+            var validationMode = ResolveValidationMode(settings);
+
             var tlsBuilder = new MqttClientTlsOptionsBuilder()
                 .UseTls(settings.UseTls)
                 .WithSslProtocols(settings.SslProtocols);
 
-            if (settings.AllowUntrustedCertificates)
+            if (validationMode == TlsValidationMode.AllowUntrusted)
             {
                 tlsBuilder = tlsBuilder
                     .WithAllowUntrustedCertificates(true)
                     .WithIgnoreCertificateChainErrors(true)
                     .WithIgnoreCertificateRevocationErrors(true)
                     .WithCertificateValidationHandler(_ => true);
+            }
+            else if (validationMode != TlsValidationMode.Strict)
+            {
+                tlsBuilder = tlsBuilder.WithCertificateValidationHandler(
+                    ctx => ValidateServerCertificate(ctx, settings, validationMode)
+                );
             }
 
             var tls = tlsBuilder.Build();
@@ -186,6 +197,85 @@ namespace MQTT_TLS_Bridge.Publisher
                 );
 
             return optionsBuilder.Build();
+        }
+
+        private static TlsValidationMode ResolveValidationMode(PublisherConnectionSettings settings)
+        {
+            if (settings.ValidationMode != TlsValidationMode.Strict)
+                return settings.ValidationMode;
+
+            return settings.AllowUntrustedCertificates
+                ? TlsValidationMode.AllowUntrusted
+                : TlsValidationMode.Strict;
+        }
+
+        private static bool ValidateServerCertificate(
+            MqttClientCertificateValidationCallbackContext context,
+            PublisherConnectionSettings settings,
+            TlsValidationMode mode
+        )
+        {
+            if (mode == TlsValidationMode.Strict)
+                return context.SslPolicyErrors == SslPolicyErrors.None;
+
+            if (context.Certificate == null)
+                return false;
+
+            using var cert = new X509Certificate2(context.Certificate);
+
+            return mode switch
+            {
+                TlsValidationMode.CustomCa => ValidateWithCustomCa(settings, cert),
+                TlsValidationMode.ThumbprintPinning => ValidateWithThumbprint(settings, cert),
+                _ => false,
+            };
+        }
+
+        private static bool ValidateWithCustomCa(
+            PublisherConnectionSettings settings,
+            X509Certificate2 cert
+        )
+        {
+            if (string.IsNullOrWhiteSpace(settings.CaCertificatePath))
+                return false;
+
+            try
+            {
+                using var caCert = CertUtil.LoadCertificateFromFile(settings.CaCertificatePath);
+                using var chain = new X509Chain();
+
+                chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+                chain.ChainPolicy.VerificationFlags = X509VerificationFlags.NoFlag;
+                chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
+                chain.ChainPolicy.CustomTrustStore.Add(caCert);
+
+                return chain.Build(cert);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool ValidateWithThumbprint(
+            PublisherConnectionSettings settings,
+            X509Certificate2 cert
+        )
+        {
+            var expected = NormalizeThumbprint(settings.PinnedThumbprint);
+            if (string.IsNullOrWhiteSpace(expected))
+                return false;
+
+            var actual = NormalizeThumbprint(cert.Thumbprint);
+            return string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string? NormalizeThumbprint(string? thumbprint)
+        {
+            if (string.IsNullOrWhiteSpace(thumbprint))
+                return null;
+
+            return thumbprint.Replace(":", string.Empty).Replace(" ", string.Empty).Trim();
         }
 
         private async Task DoConnectAsync(
