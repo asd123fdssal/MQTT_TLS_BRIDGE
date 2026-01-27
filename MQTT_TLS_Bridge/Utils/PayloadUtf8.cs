@@ -23,6 +23,7 @@ namespace MQTT_TLS_Bridge.Utils
 
         public static bool TryDecodeBase64(string? base64, out string payloadText)
         {
+            // Treat missing/whitespace payloads as invalid so callers can provide a clear error.
             if (string.IsNullOrWhiteSpace(base64))
             {
                 payloadText = string.Empty;
@@ -37,6 +38,7 @@ namespace MQTT_TLS_Bridge.Utils
             }
             catch (FormatException)
             {
+                // Invalid Base64 input: return false so callers can respond with a user-facing error.
                 payloadText = string.Empty;
                 return false;
             }

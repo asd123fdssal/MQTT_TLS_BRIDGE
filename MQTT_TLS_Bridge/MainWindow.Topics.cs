@@ -9,6 +9,7 @@ namespace MQTT_TLS_Bridge
 {
     public partial class MainWindow
     {
+        // Text shown when no payload has been received for the selected topic.
         private const string NoTopicDataText = "(no data yet)";
 
         private void ClientTopicListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -83,9 +84,11 @@ namespace MQTT_TLS_Bridge
             TextBox lastMessageTextBox
         )
         {
+            // Only update the detail view if a valid topic is selected.
             if (listBox.SelectedItem is not string topic || string.IsNullOrWhiteSpace(topic))
                 return;
 
+            // Use the latest payload for the topic or a consistent placeholder.
             lastMessageTextBox.Text = lastByTopic.TryGetValue(topic, out var payload)
                 ? payload
                 : NoTopicDataText;
