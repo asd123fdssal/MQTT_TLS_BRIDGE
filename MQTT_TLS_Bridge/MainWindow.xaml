@@ -5,15 +5,34 @@
   xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
   xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
   xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+  xmlns:tray="clr-namespace:Wpf.Ui.Tray.Controls;assembly=Wpf.Ui.Tray"
   xmlns:local="clr-namespace:MQTT_TLS_Bridge"
   mc:Ignorable="d"
-  Title="MQTT TLS Tester"
+  Title="MQTT TLS Bridge"
   Height="650"
   Width="1200"
   Loaded="Window_Loaded"
   Closing="Window_Closing"
 >
   <Grid Background="{DynamicResource WindowBackgroundBrush}" d:Background="#1E1E1E">
+    <tray:NotifyIcon
+      x:Name="AppTrayIcon"
+      FocusOnLeftClick="True"
+      MenuOnRightClick="True"
+      TooltipText="MQTT TLS Tester"
+      Icon="pack://application:,,,/icon256.ico"
+      LeftDoubleClick="AppTrayIcon_LeftDoubleClick"
+    >
+      <!-- Tray menu -->
+      <tray:NotifyIcon.Menu>
+        <ContextMenu>
+          <MenuItem Header="Open" Click="TrayOpen_Click" />
+          <Separator />
+          <MenuItem Header="Exit" Click="TrayExit_Click" />
+        </ContextMenu>
+      </tray:NotifyIcon.Menu>
+    </tray:NotifyIcon>
+
     <TabControl Margin="16">
       <!-- Client -->
       <TabItem>

@@ -1,6 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Security.Authentication;
@@ -17,6 +18,7 @@ using MQTT_TLS_Bridge.Publisher;
 using MQTT_TLS_Bridge.Settings;
 using MQTTnet.Protocol;
 using Wpf.Ui.Appearance;
+using Wpf.Ui.Tray.Controls;
 using AppClientSettings = MQTT_TLS_Bridge.Settings.ClientSettings;
 
 namespace MQTT_TLS_Bridge
@@ -72,6 +74,8 @@ namespace MQTT_TLS_Bridge
         private Action<string, string, string>? _onPacketReceived;
         private Action<string, string, bool>? _onPacketSent;
 
+        private bool _exitRequested;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -114,7 +118,7 @@ namespace MQTT_TLS_Bridge
             });
         }
 
-        private void Window_Loaded(object sender, RoutedEventArgs e)
+        private async void Window_Loaded(object sender, RoutedEventArgs e)
         {
             try
             {
@@ -134,6 +138,7 @@ namespace MQTT_TLS_Bridge
 
                 ServerAllowRemoteCheckBox.IsChecked = false;
                 ServerToggle.IsChecked = true;
+                AppTrayIcon.Register();
             }
             catch (Exception ex)
             {
@@ -145,6 +150,13 @@ namespace MQTT_TLS_Bridge
         {
             if (_isShuttingDown)
                 return;
+
+            if (!_exitRequested)
+            {
+                e.Cancel = true;
+                Hide();
+                return;
+            }
 
             _publisherService.ConnectionStateChanged -= PublisherService_ConnectionStateChanged;
 
@@ -208,6 +220,25 @@ namespace MQTT_TLS_Bridge
                 {
                     // 종료 단계에서 파일 로그 정리 실패는 복구 불가이며 앱 종료 흐름을 방해하지 않기 위해 무시합니다.
                     AppendClientLog($"FileLog dispose error: {ex.GetType().Name}: {ex.Message}");
+                }
+                try
+                {
+                    await Dispatcher.InvokeAsync(() =>
+                    {
+                        try
+                        {
+                            AppTrayIcon.Unregister();
+                            AppTrayIcon.Dispose();
+                        }
+                        catch
+                        {
+                            // 트레이 해제
+                        }
+                    });
+                }
+                catch
+                {
+                    // 트레이 해제
                 }
             }
         }
@@ -1419,6 +1450,32 @@ namespace MQTT_TLS_Bridge
         private sealed record SubscriptionEntry(string TopicFilter, MqttQualityOfServiceLevel Qos)
         {
             public override string ToString() => $"{TopicFilter} (QoS {(int)Qos})";
+        }
+
+        private void AppTrayIcon_LeftDoubleClick(NotifyIcon sender, RoutedEventArgs e)
+        {
+            RestoreFromTray();
+        }
+
+        private void TrayOpen_Click(object sender, RoutedEventArgs e)
+        {
+            RestoreFromTray();
+        }
+
+        private void TrayExit_Click(object sender, RoutedEventArgs e)
+        {
+            _exitRequested = true;
+            Close();
+        }
+
+        private void RestoreFromTray()
+        {
+            Show();
+            WindowState = WindowState.Normal;
+            Activate();
+            Topmost = true;
+            Topmost = false;
+            Focus();
         }
     }
 }

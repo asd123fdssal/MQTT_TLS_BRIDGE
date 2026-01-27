@@ -1,5 +1,4 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
@@ -10,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="icon256.ico" />
+    <Resource Include="icon256.ico" />
   </ItemGroup>
 
   <ItemGroup>
@@ -22,5 +21,4 @@
     <PackageReference Include="WPF-UI.Abstractions" Version="4.2.0" />
     <PackageReference Include="WPF-UI.Tray" Version="4.2.0" />
   </ItemGroup>
-
 </Project>
