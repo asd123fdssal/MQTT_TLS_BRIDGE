@@ -1,10 +1,9 @@
-﻿using System.Buffers;
-using System.Net;
+﻿using System.Net;
 using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
-using System.Text;
 using MQTTnet.Server;
+using MQTT_TLS_Bridge.Utils;
 
 namespace MQTT_TLS_Bridge.Broker
 {
@@ -25,6 +24,8 @@ namespace MQTT_TLS_Bridge.Broker
             CancellationToken cancellationToken
         )
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             if (IsRunning)
             {
                 WriteLog("Broker is already running.");
@@ -34,12 +35,7 @@ namespace MQTT_TLS_Bridge.Broker
             if (string.IsNullOrWhiteSpace(pfxPath))
                 throw new InvalidOperationException("PFX path is empty.");
 
-            var cert = X509CertificateLoader.LoadPkcs12FromFile(
-                pfxPath,
-                pfxPassword,
-                X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.PersistKeySet,
-                loaderLimits: null
-            );
+            var cert = CertUtil.LoadPkcs12FromFile(pfxPath, pfxPassword);
 
             if (!cert.HasPrivateKey)
                 throw new CryptographicException("PFX does not contain a private key.");
@@ -66,6 +62,8 @@ namespace MQTT_TLS_Bridge.Broker
             _server = serverFactory.CreateMqttServer(options);
             RegisterServerEventHandlers(_server);
 
+            cancellationToken.ThrowIfCancellationRequested();
+
             await _server.StartAsync();
 
             WriteLog($"Broker started on mqtts://localhost:{port} ({sslProtocols}).");
@@ -73,6 +71,8 @@ namespace MQTT_TLS_Bridge.Broker
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             if (_server == null)
             {
                 WriteLog("Broker is not initialized.");
@@ -123,7 +123,7 @@ namespace MQTT_TLS_Bridge.Broker
             server.InterceptingPublishAsync += e =>
             {
                 var topic = e.ApplicationMessage.Topic;
-                var payloadText = DecodePayloadAsUtf8(e.ApplicationMessage.Payload);
+                var payloadText = PayloadUtf8.Decode(e.ApplicationMessage.Payload);
 
                 MessageReceived?.Invoke(
                     new BrokerMessage
@@ -137,17 +137,6 @@ namespace MQTT_TLS_Bridge.Broker
                 WriteLog($"Publish intercepted: ClientId={e.ClientId}, Topic={topic}");
                 return Task.CompletedTask;
             };
-        }
-
-        private static string DecodePayloadAsUtf8(ReadOnlySequence<byte> payload)
-        {
-            if (payload.IsEmpty)
-                return "(empty)";
-
-            if (payload.IsSingleSegment)
-                return Encoding.UTF8.GetString(payload.FirstSpan);
-
-            return Encoding.UTF8.GetString(payload.ToArray());
         }
 
         private void WriteLog(string message) => Log?.Invoke(message);
