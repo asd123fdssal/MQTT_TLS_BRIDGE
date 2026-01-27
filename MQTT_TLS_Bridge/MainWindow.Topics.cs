@@ -9,28 +9,26 @@ namespace MQTT_TLS_Bridge
 {
     public partial class MainWindow
     {
+
+        // Text shown when no payload has been received for the selected topic.
+        private const string NoTopicDataText = "(no data yet)";
+
         private void ClientTopicListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            var topic = ClientTopicListBox.SelectedItem as string;
-            if (string.IsNullOrWhiteSpace(topic))
-                return;
-
-            if (_clientLastByTopic.TryGetValue(topic, out var payload))
-                ClientLastMessageTextBox.Text = payload;
-            else
-                ClientLastMessageTextBox.Text = "(no data yet)";
+            UpdateSelectedTopicMessage(
+                ClientTopicListBox,
+                _clientLastByTopic,
+                ClientLastMessageTextBox
+            );
         }
 
         private void TopicListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            var topic = TopicListBox.SelectedItem as string;
-            if (string.IsNullOrWhiteSpace(topic))
-                return;
-
-            if (_brokerLastByTopic.TryGetValue(topic, out var payload))
-                BrokerDataTextBox.Text = payload;
-            else
-                BrokerDataTextBox.Text = "(no data yet)";
+            UpdateSelectedTopicMessage(
+                TopicListBox,
+                _brokerLastByTopic,
+                BrokerDataTextBox
+            );
         }
 
         private void OnBrokerMessageReceived(BrokerMessage msg)
@@ -79,6 +77,22 @@ namespace MQTT_TLS_Bridge
                 )
                     lastMessageTextBox.Text = payloadText;
             });
+        }
+
+        private static void UpdateSelectedTopicMessage(
+            ListBox listBox,
+            ConcurrentDictionary<string, string> lastByTopic,
+            TextBox lastMessageTextBox
+        )
+        {
+            // Only update the detail view if a valid topic is selected.
+            if (listBox.SelectedItem is not string topic || string.IsNullOrWhiteSpace(topic))
+                return;
+
+            // Use the latest payload for the topic or a consistent placeholder.
+            lastMessageTextBox.Text = lastByTopic.TryGetValue(topic, out var payload)
+                ? payload
+                : NoTopicDataText;
         }
     }
 }

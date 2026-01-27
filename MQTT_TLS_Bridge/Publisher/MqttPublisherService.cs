@@ -12,6 +12,7 @@ namespace MQTT_TLS_Bridge.Publisher
     {
         private IMqttClient? _client;
 
+        // Cache delegates so we can detach them reliably on reset/dispose.
         private Func<MqttClientConnectedEventArgs, Task>? _onConnected;
         private Func<MqttClientDisconnectedEventArgs, Task>? _onDisconnected;
         private Func<MqttApplicationMessageReceivedEventArgs, Task>? _onMessageReceived;
@@ -65,6 +66,7 @@ namespace MQTT_TLS_Bridge.Publisher
             }
             finally
             {
+                // Always transition state and emit a log, even if disconnect throws.
                 SetState(ConnectionState.Disconnected, null);
                 WriteLog("Client disconnected.");
             }
