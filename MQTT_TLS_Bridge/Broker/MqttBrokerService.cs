@@ -10,6 +10,7 @@ namespace MQTT_TLS_Bridge.Broker
     public sealed class MqttBrokerService : IAsyncDisposable
     {
         private MqttServer? _server;
+        // Keep the loaded certificate around so we can dispose it with the broker server.
         private X509Certificate2? _certificate;
 
         public bool IsRunning => _server?.IsStarted == true;
@@ -33,6 +34,7 @@ namespace MQTT_TLS_Bridge.Broker
                 return;
             }
 
+            // Defensive cleanup in case a previous server was partially initialized.
             if (_server != null)
                 DisposeServer();
 
@@ -80,6 +82,7 @@ namespace MQTT_TLS_Bridge.Broker
             }
             catch
             {
+                // Ensure server/cert resources are released if startup fails or is canceled.
                 DisposeServer();
                 throw;
             }
@@ -100,6 +103,7 @@ namespace MQTT_TLS_Bridge.Broker
             if (!_server.IsStarted)
             {
                 WriteLog("Broker is not running.");
+                // Release any allocated resources even if the server is already stopped.
                 DisposeServer();
                 return;
             }
@@ -141,6 +145,7 @@ namespace MQTT_TLS_Bridge.Broker
 
             if (_certificate != null)
             {
+                // Explicitly dispose the certificate to release native handles.
                 _certificate.Dispose();
                 _certificate = null;
             }
