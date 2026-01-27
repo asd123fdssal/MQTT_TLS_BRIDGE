@@ -4,7 +4,6 @@ using System.Security.Cryptography.X509Certificates;
 using MQTT_TLS_Bridge.Enums;
 using MQTT_TLS_Bridge.Utils;
 using MQTTnet;
-using MQTTnet.Client;
 using MQTTnet.Protocol;
 
 namespace MQTT_TLS_Bridge.Publisher
@@ -178,8 +177,8 @@ namespace MQTT_TLS_Bridge.Publisher
             }
             else if (validationMode != TlsValidationMode.Strict)
             {
-                tlsBuilder = tlsBuilder.WithCertificateValidationHandler(
-                    ctx => ValidateServerCertificate(ctx, settings, validationMode)
+                tlsBuilder = tlsBuilder.WithCertificateValidationHandler(ctx =>
+                    ValidateServerCertificate(ctx, settings, validationMode)
                 );
             }
 
@@ -210,7 +209,7 @@ namespace MQTT_TLS_Bridge.Publisher
         }
 
         private static bool ValidateServerCertificate(
-            MqttClientCertificateValidationCallbackContext context,
+            MqttClientCertificateValidationEventArgs context,
             PublisherConnectionSettings settings,
             TlsValidationMode mode
         )
