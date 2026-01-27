@@ -100,6 +100,7 @@ namespace MQTT_TLS_Bridge.Broker
             if (!_server.IsStarted)
             {
                 WriteLog("Broker is not running.");
+                DisposeServer();
                 return;
             }
 
