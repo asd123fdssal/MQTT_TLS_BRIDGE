@@ -3,13 +3,16 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Security.Authentication;
+
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using MQTT_TLS_Bridge.Control;
 using MQTT_TLS_Bridge.Enums;
 using MQTT_TLS_Bridge.Publisher;
+
 using MQTT_TLS_Bridge.Utils;
+
 using MQTTnet.Protocol;
 
 namespace MQTT_TLS_Bridge

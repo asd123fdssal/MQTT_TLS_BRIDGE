@@ -9,6 +9,7 @@ namespace MQTT_TLS_Bridge
 {
     public partial class MainWindow
     {
+
         // Text shown when no payload has been received for the selected topic.
         private const string NoTopicDataText = "(no data yet)";
 

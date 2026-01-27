@@ -60,6 +60,7 @@ namespace MQTT_TLS_Bridge
         {
             Dispatcher.Invoke(() =>
             {
+
                 // Keep UI log size bounded to avoid unbounded memory growth.
                 AppendLogLine(
                     textBox,
