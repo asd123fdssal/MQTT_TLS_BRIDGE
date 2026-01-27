@@ -2,14 +2,15 @@
 using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
-using MQTTnet.Server;
 using MQTT_TLS_Bridge.Utils;
+using MQTTnet.Server;
 
 namespace MQTT_TLS_Bridge.Broker
 {
     public sealed class MqttBrokerService : IAsyncDisposable
     {
         private MqttServer? _server;
+
         // Keep the loaded certificate around so we can dispose it with the broker server.
         private X509Certificate2? _certificate;
 

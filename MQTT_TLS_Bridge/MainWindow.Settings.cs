@@ -1,4 +1,3 @@
-using System;
 using System.Security.Authentication;
 using System.Windows;
 using System.Windows.Controls;

@@ -1,7 +1,4 @@
-﻿using System.Configuration;
-using System.Data;
-using System.Windows;
-using Wpf.Ui.Appearance;
+﻿using System.Windows;
 
 namespace MQTT_TLS_Bridge
 {

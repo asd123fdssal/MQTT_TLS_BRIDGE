@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Windows.Controls;
@@ -9,7 +8,6 @@ namespace MQTT_TLS_Bridge
 {
     public partial class MainWindow
     {
-
         // Text shown when no payload has been received for the selected topic.
         private const string NoTopicDataText = "(no data yet)";
 
@@ -24,11 +22,7 @@ namespace MQTT_TLS_Bridge
 
         private void TopicListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            UpdateSelectedTopicMessage(
-                TopicListBox,
-                _brokerLastByTopic,
-                BrokerDataTextBox
-            );
+            UpdateSelectedTopicMessage(TopicListBox, _brokerLastByTopic, BrokerDataTextBox);
         }
 
         private void OnBrokerMessageReceived(BrokerMessage msg)

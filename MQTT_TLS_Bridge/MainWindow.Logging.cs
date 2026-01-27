@@ -1,4 +1,3 @@
-using System;
 using System.Windows.Controls;
 
 namespace MQTT_TLS_Bridge
@@ -47,7 +46,13 @@ namespace MQTT_TLS_Bridge
 
         private void AppendServerLog(string message)
         {
-            AppendLog(LogServerName, ServerLogTextBox, message, MaxServerLogLines, TrimServerLogLines);
+            AppendLog(
+                LogServerName,
+                ServerLogTextBox,
+                message,
+                MaxServerLogLines,
+                TrimServerLogLines
+            );
         }
 
         private void AppendLog(
@@ -60,7 +65,6 @@ namespace MQTT_TLS_Bridge
         {
             Dispatcher.Invoke(() =>
             {
-
                 // Keep UI log size bounded to avoid unbounded memory growth.
                 AppendLogLine(
                     textBox,

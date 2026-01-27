@@ -1,15 +1,9 @@
 ﻿using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
-using System.Net;
-using System.Security.Authentication;
-using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using Microsoft.Win32;
 using MQTT_TLS_Bridge.Broker;
 using MQTT_TLS_Bridge.Control;
 using MQTT_TLS_Bridge.Enums;
@@ -19,7 +13,6 @@ using MQTT_TLS_Bridge.Settings;
 using MQTTnet.Protocol;
 using Wpf.Ui.Appearance;
 using Wpf.Ui.Tray.Controls;
-using AppClientSettings = MQTT_TLS_Bridge.Settings.ClientSettings;
 
 namespace MQTT_TLS_Bridge
 {
