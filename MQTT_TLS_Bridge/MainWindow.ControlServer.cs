@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Security.Authentication;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using MQTT_TLS_Bridge.Control;
 using MQTT_TLS_Bridge.Enums;
 using MQTT_TLS_Bridge.Publisher;
+using MQTT_TLS_Bridge.Utils;
 using MQTTnet.Protocol;
 
 namespace MQTT_TLS_Bridge
@@ -514,8 +514,8 @@ namespace MQTT_TLS_Bridge
                 && !string.IsNullOrWhiteSpace(b64)
             )
             {
-                var bytes = Convert.FromBase64String(b64);
-                payload = Encoding.UTF8.GetString(bytes);
+                if (!PayloadUtf8.TryDecodeBase64(b64, out payload))
+                    return IniResponse.Failure(req.Id, ErrBadRequest, "payload_b64 is invalid");
             }
             else if (req.Arguments.TryGetValue("payload", out var plain))
             {
