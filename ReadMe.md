@@ -278,3 +278,342 @@ Args:
 - Settings/   – settings.json storage
 - Logging/    – daily file logs
 - MainWindow.* – UI orchestration
+
+---
+
+## Architecture
+### Full Structural Diagram
+
+```mermaid
+flowchart LR
+  %% External actors
+  TT["External Test Tool<br/>(Inspector / Automation)"]:::ext
+  MC["External MQTT Client(s)<br/>(optional)"]:::ext
+  EB["External MQTT Broker<br/>(optional)"]:::ext
+
+  %% App
+  subgraph APP["MQTT TLS Bridge (WPF)"]
+    UI["MainWindow<br/>(UI Orchestrator)"]:::core
+    CS["TCP Control Server<br/>(INI packets)"]:::core
+    BR["MQTTS Broker Service<br/>(MQTTnet.Server)"]:::svc
+    CL["MQTT Client Service<br/>(MQTTnet)"]:::svc
+    LOG["Logging<br/>(UI + Files)"]:::svc
+    SET["Settings Store<br/>(Config/settings.json)"]:::svc
+
+    CS --> UI
+    UI --> BR
+    UI --> CL
+    UI --> LOG
+    UI --> SET
+
+    BR --> UI
+    CL --> UI
+  end
+
+  %% Label nodes (GitHub-safe)
+  LCTRL["TCP :4811<br/>INI request/response"]:::note
+  LBRK["MQTTS :8883<br/>(optional)"]:::note
+  LEB["MQTT/MQTTS"]:::note
+
+  %% Control channel
+  TT --- LCTRL --- CS
+
+  %% MQTT channels
+  MC --- LBRK --- BR
+  CL --- LEB --- EB
+
+  classDef ext fill:#f3f3f3,stroke:#999,color:#111;
+  classDef core fill:#e8f0ff,stroke:#4a78ff,color:#111;
+  classDef svc fill:#eafff1,stroke:#2fb36d,color:#111;
+  classDef note fill:#fff7e6,stroke:#e0a800,color:#111;
+```
+
+---
+
+### Control Server Request-Response Sequence
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant TT as External Test Tool
+  participant CS as TCP Control Server
+  participant UI as MainWindow
+  participant SVC as Broker and Client Services
+  participant LOG as Logger
+
+  TT->>CS: Connect TCP 4811
+  TT->>CS: Send INI request (id, cmd, args)
+  CS->>LOG: Log raw request
+  CS->>UI: Dispatch parsed request
+  UI->>SVC: Execute command
+  SVC-->>UI: Result or error
+  UI-->>CS: Build INI response (ok, msg, state)
+  CS->>LOG: Log raw response
+  CS-->>TT: Send INI response
+```
+
+---
+
+### Client Connection Status Diagram
+
+```mermaid
+stateDiagram-v2
+  [*] --> Disconnected
+
+  Disconnected --> Connecting: client connect
+  Connecting --> Connected: connect ok
+  Connecting --> Disconnected: connect fail
+
+  Connected --> Disconnecting: client disconnect
+  Disconnecting --> Disconnected: disconnect ok
+
+  Connected --> Connected: publish or subscribe
+  Connected --> Disconnected: network drop
+```
+
+---
+
+### TLS Certificate Verification Mode Determination Flow
+
+```mermaid
+flowchart TD
+  A["Server certificate presented"]:::core
+  B{"allowUntrusted enabled"}:::dec
+  OK["ACCEPT"]:::ok
+  FAIL["REJECT"]:::fail
+
+  C{"custom CA configured"}:::dec
+  D{"chain valid"}:::dec
+
+  E{"thumbprint pinning configured"}:::dec
+  F{"thumbprint match"}:::dec
+
+  G["Default OS trust validation"]:::core
+  H{"no SSL policy errors"}:::dec
+
+  Y1["Yes"]:::note
+  N1["No"]:::note
+  Y2["Yes"]:::note
+  N2["No"]:::note
+  Y3["Yes"]:::note
+  N3["No"]:::note
+  Y4["Yes"]:::note
+  N4["No"]:::note
+  Y5["Yes"]:::note
+  N5["No"]:::note
+
+  A --> B
+  B --> Y1 --> OK
+  B --> N1 --> C
+
+  C --> Y2 --> D
+  D --> Y3 --> OK
+  D --> N3 --> FAIL
+
+  C --> N2 --> E
+  E --> Y4 --> F
+  F --> Y5 --> OK
+  F --> N5 --> FAIL
+
+  E --> N4 --> G
+  G --> H
+  H --> Y2 --> OK
+  H --> N2 --> FAIL
+
+  classDef core fill:#e8f0ff,stroke:#4a78ff,color:#111;
+  classDef dec fill:#fff7e6,stroke:#e0a800,color:#111;
+  classDef ok fill:#eafff1,stroke:#2fb36d,color:#111;
+  classDef fail fill:#ffecec,stroke:#d64545,color:#111;
+  classDef note fill:#fff7e6,stroke:#e0a800,color:#111;
+```
+
+---
+
+### Test Flow
+
+```mermaid
+flowchart LR
+  T["Test Script"]:::ext
+  TT["External Test Tool"]:::ext
+  CS["TCP Control Server"]:::core
+  UI["MainWindow"]:::core
+  BR["Embedded MQTTS Broker"]:::svc
+  CL["Embedded MQTT Client"]:::svc
+  DUT["Device Under Test<br/>(MQTT Client)"]:::ext
+  LOG["Logs and UI View"]:::svc
+
+  %% Label nodes
+  LINI["INI commands"]:::note
+  LCMD["broker start<br/>client connect<br/>publish subscribe"]:::note
+  LTLS["TLS handshake"]:::note
+  LMQTT["MQTT publish and subscribe"]:::note
+
+  T --- LINI --- TT
+  TT --- LINI --- CS
+
+  CS --> UI
+  UI --- LCMD --- BR
+  UI --- LCMD --- CL
+
+  DUT --- LTLS --- BR
+  DUT --- LMQTT --- BR
+
+  BR --> LOG
+  CL --> LOG
+
+  classDef ext fill:#f3f3f3,stroke:#999,color:#111;
+  classDef core fill:#e8f0ff,stroke:#4a78ff,color:#111;
+  classDef svc fill:#eafff1,stroke:#2fb36d,color:#111;
+  classDef note fill:#fff7e6,stroke:#e0a800,color:#111;
+```
+
+---
+
+### Broker Lifecycle diagram
+
+```mermaid
+stateDiagram-v2
+  [*] --> Stopped
+
+  Stopped --> Starting: broker start
+  Starting --> Running: listen ok
+  Starting --> Stopped: cert error
+
+  Running --> Stopping: broker stop
+  Stopping --> Stopped: stopped
+
+  Running --> Stopped: fatal error
+```
+
+The embedded broker has an explicit lifecycle.
+All transitions are logged and reflected in the UI state.
+
+---
+
+### Client Lifecycle + Retry Perspective Diagram
+
+```mermaid
+stateDiagram-v2
+  [*] --> Idle
+
+  Idle --> Connecting: client connect
+  Connecting --> Connected: connected
+  Connecting --> Idle: timeout
+
+  Connected --> Subscribed: subscribe
+  Subscribed --> Connected: unsubscribe
+
+  Connected --> Idle: disconnect
+  Connected --> Idle: connection lost
+```
+
+---
+
+### INI Command Processing Pipeline
+
+```mermaid
+flowchart LR
+  RAW["Raw TCP Data"]:::note
+  PARSE["INI Parser"]:::core
+  VALID["Command Validation"]:::core
+  DISPATCH["Command Dispatcher"]:::core
+  EXEC["Service Execution"]:::svc
+  RESP["INI Response Builder"]:::core
+
+  RAW --> PARSE
+  PARSE --> VALID
+  VALID --> DISPATCH
+  DISPATCH --> EXEC
+  EXEC --> RESP
+
+  classDef core fill:#e8f0ff,stroke:#4a78ff,color:#111;
+  classDef svc fill:#eafff1,stroke:#2fb36d,color:#111;
+  classDef note fill:#fff7e6,stroke:#e0a800,color:#111;
+```
+
+---
+
+### Error Handling & Logging Flow
+
+```mermaid
+flowchart TD
+  ERR["Exception"]:::fail
+  CAT["Error Categorization"]:::core
+  LOGF["File Log"]:::svc
+  LOGU["UI Log View"]:::svc
+  RESP["INI Error Response"]:::core
+
+  ERR --> CAT
+  CAT --> LOGF
+  CAT --> LOGU
+  CAT --> RESP
+
+  classDef core fill:#e8f0ff,stroke:#4a78ff,color:#111;
+  classDef svc fill:#eafff1,stroke:#2fb36d,color:#111;
+  classDef fail fill:#ffecec,stroke:#d64545,color:#111;
+```
+
+All errors are centrally categorized and reported consistently
+to logs, UI, and control responses.
+
+---
+
+### Topic Flow
+
+```mermaid
+flowchart LR
+  PUB["Publish Topic"]:::note
+  SUB["Subscribe Topic"]:::note
+
+  EXT["External MQTT Client"]:::ext
+  BR["Embedded Broker"]:::svc
+  CL["Embedded Client"]:::svc
+  EB["External Broker"]:::ext
+
+  EXT --- PUB --- BR
+  BR --- SUB --- EXT
+
+  CL --- PUB --- EB
+  EB --- SUB --- CL
+
+  classDef ext fill:#f3f3f3,stroke:#999,color:#111;
+  classDef svc fill:#eafff1,stroke:#2fb36d,color:#111;
+  classDef note fill:#fff7e6,stroke:#e0a800,color:#111;
+```
+
+---
+
+### Configuration loading flow
+
+```mermaid
+flowchart LR
+  FILE["settings.json"]:::note
+  LOAD["Settings Loader"]:::core
+  APPLY["Apply to Services"]:::core
+  UI["UI State"]:::core
+
+  FILE --> LOAD
+  LOAD --> APPLY
+  APPLY --> UI
+
+  classDef core fill:#e8f0ff,stroke:#4a78ff,color:#111;
+  classDef note fill:#fff7e6,stroke:#e0a800,color:#111;
+```
+
+---
+
+### Typical Automated Test Scenario
+
+```mermaid
+flowchart LR
+  STEP1["Start Broker"]:::step
+  STEP2["Connect DUT"]:::step
+  STEP3["Subscribe Topics"]:::step
+  STEP4["Publish Test Data"]:::step
+  STEP5["Verify Receive"]:::step
+  STEP6["Stop Broker"]:::step
+
+  STEP1 --> STEP2 --> STEP3 --> STEP4 --> STEP5 --> STEP6
+
+  classDef step fill:#e8f0ff,stroke:#4a78ff,color:#111;
+```
