@@ -1,4 +1,22 @@
-# MQTT TLS Bridge
+<p align="center">
+  <strong>MQTT TLS Bridge</strong><br/>
+  MQTT/TLS testing utility with embedded broker, client, and automation control
+</p>
+
+<p align="center">
+  <a href="#quick-start">Quick Start</a> •
+  <a href="#architecture">Architecture</a> •
+  <a href="#control-server-protocol">Control Protocol</a> •
+  <a href="#troubleshooting">Troubleshooting</a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/.NET-net10.0--windows-512BD4" />
+  <img src="https://img.shields.io/badge/MQTT-MQTTnet-blue" />
+  <img src="https://img.shields.io/badge/TLS-1.2%20%7C%201.3-green" />
+  <img src="https://img.shields.io/badge/Platform-Windows-lightgrey" />
+</p>
+
 
 A Windows WPF utility that combines:
 
@@ -9,13 +27,118 @@ A Windows WPF utility that combines:
 Target use case: MQTT/TLS interoperability testing (TLS 1.3 / 1.2), certificate validation scenarios, and scripted automation of broker/client flows.
 
 ---
+## 📚 Contents
+- [Quick Start](#quick-start)
+- [Features](#features)
+- [Control Server Protocol](#control-server-protocol)
+- [Architecture](#architecture)
+- [Troubleshooting](#troubleshooting)
+- [Security Notes](#security-notes)
+---
 
-## Tech Stack
+## Quick Start
 
-- **.NET**: net10.0-windows
-- **UI**: WPF + WPF-UI / WPF-UI.Tray
-- **MQTT**: MQTTnet + MQTTnet.Server
-- **MVVM helpers**: CommunityToolkit.Mvvm
+This section provides minimal, working examples to verify that the broker,
+client, and control server are functioning correctly.
+No prior knowledge of the internal architecture is required.
+
+---
+
+### Quick Start – Broker Only (TLS 1.3)
+
+This scenario starts the embedded MQTTS broker and waits for incoming TLS
+connections.
+
+1. Prepare a PFX certificate file  
+   Example path: `cert\devcert.pfx`
+
+2. Configure the broker settings in the UI
+   - Broker port: `8883`
+   - TLS protocol: `1.3`
+   - PFX path and password
+
+3. Start the broker using the control server
+
+Example request:
+
+```ini
+id=1
+cmd=broker.start
+port=8883
+pfx=cert\devcert.pfx
+pfxpw=yourPassword
+tls=13
+```
+
+Expected response:
+
+```ini
+id=1
+ok=1
+running=1
+```
+
+At this point, the embedded MQTTS broker is listening for TLS connections.
+
+### Quick Start – Client to External Broker
+
+This scenario connects the built-in MQTT client to an external broker,
+subscribes to a topic, and publishes a test message.
+
+1. Connect the client
+
+```ini
+id=2
+cmd=client.connect
+host=127.0.0.1
+port=8883
+useTls=1
+tls=13
+allowUntrusted=1
+```
+
+Expected response:
+
+```ini
+id=2
+ok=1
+state=connected
+```
+
+2. Subscribe to a topic
+
+```ini
+id=3
+cmd=client.subscribe
+filter=test/topic
+qos=1
+```
+
+3. Publish a message
+
+```ini
+id=4
+cmd=client.publish
+topic=test/topic
+payload=hello mqtt
+```
+
+If the broker echoes the message back to subscribed clients,
+the client connection is working correctly.
+
+---
+
+### Quick Start – Notes
+
+- The control server expects UTF-8 encoded text
+
+- A blank line terminates each request packet
+
+- The id field is user-defined and echoed in the response
+
+- Commands can be issued while the UI is running or minimized to tray
+
+- Broker and client can be operated independently
 
 ---
 
@@ -62,6 +185,67 @@ Target use case: MQTT/TLS interoperability testing (TLS 1.3 / 1.2), certificate 
 - File logging under:
   - .\Logs\ (daily log files)
   - raw control packets (RX / TX)
+
+---
+
+## Tech Stack
+
+- **.NET**: net10.0-windows
+- **UI**: WPF + WPF-UI / WPF-UI.Tray
+- **MQTT**: MQTTnet + MQTTnet.Server
+- **MVVM helpers**: CommunityToolkit.Mvvm
+
+---
+
+
+## Control Command Reference (Summary)
+
+This section provides a concise overview of supported control commands.
+Detailed argument descriptions and examples are documented in later sections.
+
+|Command|Description|Key Arguments|Notes|
+|------|---|---|---|
+|broker.start|Start embedded MQTTS broker|port, pfx, pfxpw, tls|PFX required|
+|broker.stop|Stop broker|–|Graceful shutdown|
+|client.connect|Connect MQTT client|host, port, tls, timeoutMs|TLS optional|
+|client.disconnect|Disconnect MQTT client|–|Idempotent|
+|client.publish|Publish message|topic, payload, qos, retain|payload_b64 overrides payload|
+|client.subscribe|Subscribe to topic filter|filter, qos|QoS 0–2|
+|client.unsubscribe|Unsubscribe from topic filter|filter|–|
+
+---
+
+### Payload Handling Rules
+
+This section describes how message payloads are interpreted by the control server.
+
+  - payload_b64 takes precedence over payload
+
+  - payload is treated as UTF-8 plain text
+
+  - Binary payloads should always use payload_b64
+
+  - Empty payloads are allowed
+
+  - If both fields are omitted, an empty payload is published
+
+Example (plain text payload):
+
+```ini
+id=20
+cmd=client.publish
+topic=test/plain
+payload=hello world
+```
+
+Example (binary payload using base64):
+
+```ini
+id=21
+cmd=client.publish
+topic=test/binary
+payload_b64=AAECAwQFBgc=
+```
 
 ---
 
@@ -282,6 +466,10 @@ Args:
 ---
 
 ## Architecture
+
+The following diagrams describe the internal structure,
+control flow, and automation model of MQTT TLS Bridge.
+
 ### Full Structural Diagram
 
 ```mermaid
@@ -620,163 +808,6 @@ flowchart LR
 
 ---
 
-## Quick Start
-
-This section provides minimal, working examples to verify that the broker,
-client, and control server are functioning correctly.
-No prior knowledge of the internal architecture is required.
-
----
-
-### Quick Start – Broker Only (TLS 1.3)
-
-This scenario starts the embedded MQTTS broker and waits for incoming TLS
-connections.
-
-1. Prepare a PFX certificate file  
-   Example path: `cert\devcert.pfx`
-
-2. Configure the broker settings in the UI
-   - Broker port: `8883`
-   - TLS protocol: `1.3`
-   - PFX path and password
-
-3. Start the broker using the control server
-
-Example request:
-
-```ini
-id=1
-cmd=broker.start
-port=8883
-pfx=cert\devcert.pfx
-pfxpw=yourPassword
-tls=13
-```
-
-Expected response:
-
-```ini
-id=1
-ok=1
-running=1
-```
-
-At this point, the embedded MQTTS broker is listening for TLS connections.
-
-### Quick Start – Client to External Broker
-
-This scenario connects the built-in MQTT client to an external broker,
-subscribes to a topic, and publishes a test message.
-
-1. Connect the client
-
-```ini
-id=2
-cmd=client.connect
-host=127.0.0.1
-port=8883
-useTls=1
-tls=13
-allowUntrusted=1
-```
-
-Expected response:
-
-```ini
-id=2
-ok=1
-state=connected
-```
-
-2. Subscribe to a topic
-
-```ini
-id=3
-cmd=client.subscribe
-filter=test/topic
-qos=1
-```
-
-3. Publish a message
-
-```ini
-id=4
-cmd=client.publish
-topic=test/topic
-payload=hello mqtt
-```
-
-If the broker echoes the message back to subscribed clients,
-the client connection is working correctly.
-
----
-
-### Quick Start – Notes
-
-  - The control server expects UTF-8 encoded text
-
-  - A blank line terminates each request packet
-
-  - The id field is user-defined and echoed in the response
-
-  - Commands can be issued while the UI is running or minimized to tray
-
-  - Broker and client can be operated independently
-
----
-
-## Control Command Reference (Summary)
-
-This section provides a concise overview of supported control commands.
-Detailed argument descriptions and examples are documented in later sections.
-
-|Command|Description|Key Arguments|Notes|
-|------|---|---|---|
-|broker.start|Start embedded MQTTS broker|port, pfx, pfxpw, tls|PFX required|
-|broker.stop|Stop broker|–|Graceful shutdown|
-|client.connect|Connect MQTT client|host, port, tls, timeoutMs|TLS optional|
-|client.disconnect|Disconnect MQTT client|–|Idempotent|
-|client.publish|Publish message|topic, payload, qos, retain|payload_b64 overrides payload|
-|client.subscribe|Subscribe to topic filter|filter, qos|QoS 0–2|
-|client.unsubscribe|Unsubscribe from topic filter|filter|–|
-
----
-
-### Payload Handling Rules
-
-This section describes how message payloads are interpreted by the control server.
-
-  - payload_b64 takes precedence over payload
-
-  - payload is treated as UTF-8 plain text
-
-  - Binary payloads should always use payload_b64
-
-  - Empty payloads are allowed
-
-  - If both fields are omitted, an empty payload is published
-
-Example (plain text payload):
-
-```ini
-id=20
-cmd=client.publish
-topic=test/plain
-payload=hello world
-```
-
-Example (binary payload using base64):
-
-```ini
-id=21
-cmd=client.publish
-topic=test/binary
-payload_b64=AAECAwQFBgc=
-```
-
----
-
 ## Troubleshooting
 
 This section lists common failure scenarios and suggested resolutions.
@@ -903,3 +934,13 @@ The following principles guide the overall design of the application.
 
   - Controlled fault injection and protocol inspection
 
+---
+
+## Download
+
+Prebuilt binaries are available on the GitHub Releases page.
+
+- Windows (net10.0-windows)
+- No installer required
+
+See: **Releases → v0.1.0**
