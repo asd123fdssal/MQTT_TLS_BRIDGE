@@ -28,7 +28,11 @@ namespace MQTT_TLS_Bridge
         private readonly CancellationTokenSource _cts = new();
 
         // ListBox에 바인딩되는 표시용 토픽 목록
+        // 리스트가 바뀌면(UI에 보여주는 데이터가 바뀌면) 화면이 자동으로 갱신되도록 이벤트를 내주는 컬렉션
         private readonly ObservableCollection<string> _brokerTopics = [];
+
+        // 멀티스레드에서 안전하게 쓰는 Dictionary
+        // 여러 스레드가 동시에 읽고/쓰더라도 데이터 깨짐 없이 동작하도록 설계된 해시맵
         private readonly ConcurrentDictionary<string, string> _brokerLastByTopic = new(
             StringComparer.Ordinal
         );
@@ -54,6 +58,10 @@ namespace MQTT_TLS_Bridge
         // INI Control Server 인스턴스와 동시성 제어
         // 명령 처리 락, Lifecycle 락
         private IniControlServer? _controlServer;
+
+        // SemaphoreSlim은 동시에 실행될 수 있는 작업(코드 구간)의 개수를 제한하는 비동기용 세마포어(잠금 장치)
+        // async/await 환경에서 쓰는 락(lock) 대용으로 많이 씀
+        // 초기 허용 수 = 1, 최대 허용 수 = 1, Mutex, Lock과 유사함
         private readonly SemaphoreSlim _controlLock = new(1, 1);
         private readonly SemaphoreSlim _serverLifecycleLock = new(1, 1);
 
