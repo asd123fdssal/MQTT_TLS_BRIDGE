@@ -617,3 +617,289 @@ flowchart LR
 
   classDef step fill:#e8f0ff,stroke:#4a78ff,color:#111;
 ```
+
+---
+
+## Quick Start
+
+This section provides minimal, working examples to verify that the broker,
+client, and control server are functioning correctly.
+No prior knowledge of the internal architecture is required.
+
+---
+
+### Quick Start – Broker Only (TLS 1.3)
+
+This scenario starts the embedded MQTTS broker and waits for incoming TLS
+connections.
+
+1. Prepare a PFX certificate file  
+   Example path: `cert\devcert.pfx`
+
+2. Configure the broker settings in the UI
+   - Broker port: `8883`
+   - TLS protocol: `1.3`
+   - PFX path and password
+
+3. Start the broker using the control server
+
+Example request:
+
+```ini
+id=1
+cmd=broker.start
+port=8883
+pfx=cert\devcert.pfx
+pfxpw=yourPassword
+tls=13
+```
+
+Expected response:
+
+```ini
+id=1
+ok=1
+running=1
+```
+
+At this point, the embedded MQTTS broker is listening for TLS connections.
+
+### Quick Start – Client to External Broker
+
+This scenario connects the built-in MQTT client to an external broker,
+subscribes to a topic, and publishes a test message.
+
+1. Connect the client
+
+```ini
+id=2
+cmd=client.connect
+host=127.0.0.1
+port=8883
+useTls=1
+tls=13
+allowUntrusted=1
+```
+
+Expected response:
+
+```ini
+id=2
+ok=1
+state=connected
+```
+
+2. Subscribe to a topic
+
+```ini
+id=3
+cmd=client.subscribe
+filter=test/topic
+qos=1
+```
+
+3. Publish a message
+
+```ini
+id=4
+cmd=client.publish
+topic=test/topic
+payload=hello mqtt
+```
+
+If the broker echoes the message back to subscribed clients,
+the client connection is working correctly.
+
+---
+
+### Quick Start – Notes
+
+  - The control server expects UTF-8 encoded text
+
+  - A blank line terminates each request packet
+
+  - The id field is user-defined and echoed in the response
+
+  - Commands can be issued while the UI is running or minimized to tray
+
+  - Broker and client can be operated independently
+
+---
+
+## Control Command Reference (Summary)
+
+This section provides a concise overview of supported control commands.
+Detailed argument descriptions and examples are documented in later sections.
+
+|Command|Description|Key Arguments|Notes|
+|------|---|---|---|
+|broker.start|Start embedded MQTTS broker|port, pfx, pfxpw, tls|PFX required|
+|broker.stop|Stop broker|–|Graceful shutdown|
+|client.connect|Connect MQTT client|host, port, tls, timeoutMs|TLS optional|
+|client.disconnect|Disconnect MQTT client|–|Idempotent|
+|client.publish|Publish message|topic, payload, qos, retain|payload_b64 overrides payload|
+|client.subscribe|Subscribe to topic filter|filter, qos|QoS 0–2|
+|client.unsubscribe|Unsubscribe from topic filter|filter|–|
+
+---
+
+### Payload Handling Rules
+
+This section describes how message payloads are interpreted by the control server.
+
+  - payload_b64 takes precedence over payload
+
+  - payload is treated as UTF-8 plain text
+
+  - Binary payloads should always use payload_b64
+
+  - Empty payloads are allowed
+
+  - If both fields are omitted, an empty payload is published
+
+Example (plain text payload):
+
+```ini
+id=20
+cmd=client.publish
+topic=test/plain
+payload=hello world
+```
+
+Example (binary payload using base64):
+
+```ini
+id=21
+cmd=client.publish
+topic=test/binary
+payload_b64=AAECAwQFBgc=
+```
+
+---
+
+## Troubleshooting
+
+This section lists common failure scenarios and suggested resolutions.
+
+### Broker fails to start
+
+Possible causes:
+
+  - Broker port already in use
+
+  - Invalid or missing PFX certificate
+
+  - Incorrect PFX password
+
+  - TLS protocol mismatch
+
+Recommended actions:
+
+  - Verify the port is not used by another process
+
+  - Validate the PFX file using system tools
+
+  - Confirm TLS version compatibility
+
+---
+
+### Client connection fails
+
+Possible causes:
+
+  - TLS version mismatch (1.2 vs 1.3)
+
+  - Certificate validation mode mismatch
+
+  - Incorrect host or port
+
+  - Connection timeout
+
+Recommended actions:
+
+  - Temporarily enable allowUntrusted=1 to isolate trust issues
+
+  - Verify timeoutMs value
+
+  - Check broker logs for handshake errors
+
+---
+
+### TLS handshake errors
+
+Possible causes:
+
+  - Unsupported TLS protocol
+
+  - Invalid certificate chain
+
+  - Incorrect custom CA configuration
+
+  - Thumbprint mismatch
+
+Notes:
+
+  - Certificate thumbprints are normalized before comparison
+
+  - Whitespace and case differences are ignored
+
+---
+
+### Control server does not respond
+
+Possible causes:
+
+  - Missing blank line at end of packet
+
+  - Incorrect text encoding (must be UTF-8)
+
+  - Firewall blocking the control port
+
+  - Remote connections disabled in settings
+
+---
+
+### Security Notes
+
+The control server is intended for local automation by default.
+
+  - Binding to loopback interface is recommended
+
+  - Enabling remote access requires explicit firewall configuration
+
+  - Raw control packets (RX/TX) are logged to disk
+
+  - Logs may contain sensitive information
+
+  - Disabling “Save passwords” prevents credential persistence
+
+---
+
+### Design Principles
+
+The following principles guide the overall design of the application.
+
+  - The UI acts as an orchestration layer, not a protocol endpoint
+
+  - All automation is performed through the TCP control server
+
+  - Broker and client can operate independently or simultaneously
+
+  - Error handling and logging are centralized
+
+  - State transitions are explicitly tracked and logged
+
+---
+
+### Intended Use Cases
+
+  - MQTT/TLS interoperability testing
+
+  - TLS 1.2 and TLS 1.3 negotiation validation
+
+  - Certificate trust and pinning verification
+
+  - Automated regression testing of MQTT-enabled devices
+
+  - Controlled fault injection and protocol inspection
+
